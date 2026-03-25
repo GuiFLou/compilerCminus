@@ -320,6 +320,7 @@ void codeGen(TreeNode *syntaxTree, const char *base)
     tempCount = 0;
     labelCount = 0;
 
+    emit("GOTO", "main", "-", "-");
     genStmt(syntaxTree);
     emit("HALT", "-", "-", "-");
 
