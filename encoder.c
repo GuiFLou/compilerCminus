@@ -27,6 +27,7 @@ typedef struct {const char *mn; uint8_t op; char fmt;} Map;
 #define F1 '1'
 #define F2 '2'
 #define F3 '3'
+#define FI 'I'
 static const Map MAP[] = {
     /* Aritmética */
     {"ADD",  0b000000,F1},{"ADDI", 0b000001,F2},
@@ -57,7 +58,7 @@ static const Map MAP[] = {
     /* Comparação */
     {"SLT",   0b011001,F1},
     /* I/O */
-    {"IN",    0b011010,F3},{"OUT",  0b011011,F3},
+    {"IN",    0b011010,FI},{"OUT",  0b011011,FI},
     {NULL,0,0}
 };
 
@@ -89,6 +90,9 @@ static uint32_t makeF2(uint8_t op,int rt,int rs,int imm){
 }
 static uint32_t makeF3(uint8_t op,int addr){
     return (op<<26)|((uint32_t)addr & 0x03FFFFFF);
+}
+static uint32_t makeIO(uint8_t op,int reg){
+    return (op<<26)|(reg<<20);
 }
 
 /* ——— implementação principal ——— */
@@ -158,6 +162,8 @@ int encodeAsm(const char *srcTM,const char *dstTXT){
                 word=makeF2(m->op, mapReg(op1), mapReg(op2), imm); break; }
             case F3:{
                 int addr=0; if(op1){ addr=isalpha(*op1)?findLabel(op1):atoi(op1);} word=makeF3(m->op,addr); break; }
+            case FI:{
+                word=makeIO(m->op, mapReg(op1)); break; }
         }
         for(int b=31;b>=0;b--) fputc((word>>b)&1?'1':'0',fout);
         fputc('\n',fout);
