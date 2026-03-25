@@ -86,6 +86,10 @@ TreeNode * newStmtNode(StmtKind kind)
     t->nodekind = StmtK;
     t->kind.stmt = kind;
     t->lineno = lineno;
+    t->attr.op = 0;
+    t->attr.val = 0;
+    t->attr.len = 0;
+    t->attr.name = NULL;
     t->attr.scope = "global";
   }
   return t;
@@ -109,6 +113,10 @@ TreeNode * newExpNode(ExpKind kind)
     t->kind.exp = kind;
     t->lineno = lineno;
     t->type = voidK;
+    t->attr.op = 0;
+    t->attr.val = 0;
+    t->attr.len = 0;
+    t->attr.name = NULL;
     t->attr.scope = "global";
   }
   return t;

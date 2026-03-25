@@ -205,7 +205,7 @@ void asmGen(Quadruple *q, const char *asmFile)
         else if (!strcmp(op, "NOT"))  fprintf(o, "    not  %s,%s\n", rd, r1);
         else if (!strcmp(op, "MOVE")) fprintf(o, "    move %s,%s\n", rd, r1);
         /* Comparações: resultado 0/1 em rd */
-        else if (!strcmp(op, "EQUAL")) {
+        else if (!strcmp(op, "EQUAL") || !strcmp(op, "EQ")) {
             int lab = asmLabNum++;
             fprintf(o, "    sub  %s,%s,%s\n", rd, r1, r2);
             fprintf(o, "    beq  %s,$zero,.L_eq_%d\n", rd, lab);

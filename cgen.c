@@ -132,23 +132,53 @@ static char *genExp(TreeNode *t)
         char *a = genExp(t->child[0]);
         char *b = genExp(t->child[1]);
         char *dst = newTemp();
-        const char *opStr = "NOOP";
 
         switch (t->attr.op) {
-        case PLUS:  opStr = "ADD";   break;
-        case MINUS: opStr = "SUB";   break;
-        case TIMES: opStr = "MUL";   break;
-        case OVER:  opStr = "DIV";   break;
-        case EQ:    opStr = "EQUAL"; break;
-        case NE:    opStr = "NEQ";   break;
-        case LT:    opStr = "LT";    break;
-        case LTE:   opStr = "LTE";   break;
-        case GT:    opStr = "GT";    break;
-        case GTE:   opStr = "GTE";   break;
-        default: break;
+        case PLUS:
+            emit("ADD", a, b, dst);
+            break;
+        case MINUS:
+            emit("SUB", a, b, dst);
+            break;
+        case TIMES:
+            emit("MUL", a, b, dst);
+            break;
+        case OVER:
+            emit("DIV", a, b, dst);
+            break;
+        case EQ:
+            emit("EQ", a, b, dst);
+            break;
+        case NE:
+            emit("NEQ", a, b, dst);
+            break;
+        case LT:
+            emit("SLT", a, b, dst);
+            break;
+        case GT:
+            emit("SLT", b, a, dst);
+            break;
+        case LTE: {
+            char *tmp = newTemp();
+            char *one = newTemp();
+            emit("SLT", b, a, tmp);
+            emit("ASSIGN", "1", "-", one);
+            emit("SUB", one, tmp, dst);
+            break;
+        }
+        case GTE: {
+            char *tmp = newTemp();
+            char *one = newTemp();
+            emit("SLT", a, b, tmp);
+            emit("ASSIGN", "1", "-", one);
+            emit("SUB", one, tmp, dst);
+            break;
+        }
+        default:
+            emit("NOOP", a, b, dst);
+            break;
         }
 
-        emit(opStr, a, b, dst);
         return dst;
     }
 

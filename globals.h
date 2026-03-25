@@ -11,8 +11,6 @@
 
 #include "Parser.tab.h"
 
-#define ENDFILE 0
-
 #endif
 
 
