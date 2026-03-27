@@ -1,8 +1,5 @@
-exemplos/*
-Relatórios/*
 .DS_Store
 *.o
 *.exe
 compilador
 attr.name
-Testes/*
