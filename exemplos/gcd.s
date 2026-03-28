@@ -64,5 +64,6 @@ main:
     addi $sp,$sp,-1
     sw   $t7,0($sp)
     out  $t7
+    addi $sp,$sp,1
     # END main
     hlt

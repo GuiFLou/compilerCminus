@@ -149,6 +149,7 @@ L8:
     addi $sp,$sp,-1
     sw   $t7,0($sp)
     out  $t7
+    addi $sp,$sp,1
     lw   $t8,25($gp)
     addi $t9,$zero,1
     add  $t0,$t8,$t9

@@ -496,19 +496,26 @@ L9:
 
 ---
 
-## Issue #20 — [ASSEMBLY] `output()` empilha argumento mas `CALL_O` não desempilha a pilha
+## Issue #20 — [ASSEMBLY] `output()` mantém `PARAM` por contrato, mas `CALL_O` não consome a pilha~~ CORRIGIDA
 
-**Status:** ABERTA
+**Status:** CORRIGIDA
 **Afeta:** gcd.cms, sort.cms, qualquer programa com `output()` em laços ou dentro de funções
 **Etapa:** 3
 **Arquivo(s) do compilador:** cgen.c, asmgen.c
 
 **Descrição:**
-Chamadas para `output()` ainda geram a sequência `(PARAM, ..., -, -)` seguida de `(CALL_O, ..., -, -)`. No assembly, `PARAM` faz `push` no `$sp`, mas `CALL_O` apenas emite `out` e não chama `popArgs()`. Isso deixa palavras extras na pilha a cada `output()`.
+Pela documentação do projeto, chamadas para `output()` **devem** gerar a sequência `(PARAM, ..., -, -)` seguida de `(CALL_O, ..., -, -)`. Portanto, a presença de `PARAM` antes de `CALL_O` não é o defeito.
+
+O problema real está no `asmgen.c`: `PARAM` faz `push` no `$sp`, mas `CALL_O` apenas emite `out` e não consome/desempilha o argumento correspondente. Isso deixa palavras extras na pilha a cada `output()`.
 
 Em `main`, o efeito pode ficar mascarado porque o programa termina em `hlt`, mas em funções comuns esse crescimento artificial do frame desloca offsets de parâmetros acessados via `$sp`, podendo corromper leituras, escritas e retorno da função.
 
-**Evidência:**
+`CALL_O` precisa manter a informação do valor enviado para `output()` por dois motivos documentados:
+1. `Relatórios/Quadruplas_CI.md` define `PARAM` como o mecanismo padrão de passagem de argumentos e registra explicitamente que `CALL_O` é **precedido de `PARAM` com o mesmo valor**.
+2. `Relatórios/CONTEXT.md` repete a mesma convenção no resumo do backend: `PARAM arg - -` para argumentos de chamada e `CALL_O` para `output` com um argumento.
+3. `Relatórios/CONTEXTO_PROCESSADOR.md` fixa que `Out` no ISA indica **de qual registrador** o valor será lido; logo, `CALL_O` precisa continuar carregando o operando que identifica o valor a imprimir, enquanto `PARAM` preserva a convenção de chamada na IR.
+
+**Evidência anterior:**
 ```
 gcd.tm:
   38: (PARAM, t17, -, -)
@@ -531,18 +538,42 @@ sort.s:
 
 **Esperado:**
 ```
-Opção A:
-CALL_O não deve ser precedido por PARAM.
+`output()` deve continuar gerando:
+(PARAM, x, -, -)
+(CALL_O, x, -, -)
 
-Opção B:
-Se PARAM for mantido, CALL_O deve consumir/desempilhar o argumento logo após o out.
+No assembly, após emitir `out`, o backend deve consumir o argumento empilhado por `PARAM`
+(por exemplo, com `popArgs(1)` ou ajuste equivalente de `$sp`).
 ```
 
-**Ajuste necessário:**
-Tornar o tratamento de built-ins consistente:
-1. Em `cgen.c`, não emitir `PARAM` para `output()`, já que `CALL_O` já recebe o registrador diretamente.
-2. Alternativamente, em `asmgen.c`, fazer `CALL_O` consumir o argumento empilhado com `popArgs(o)`.
+**Correção aplicada:**
+Manter o contrato documentado do intermediário e corrigir apenas o backend:
+1. Em `cgen.c`, preservar a emissão de `PARAM` antes de `CALL_O`.
+2. Em `asmgen.c`, fazer `CALL_O` consumir o argumento empilhado logo após o `out`.
 3. Revalidar offsets de parâmetros em funções que chamam `output()` antes de novos acessos via `$sp`.
+
+**Validação após correção:**
+```
+gcd.tm:
+  38: (PARAM, t17, -, -)
+  39: (CALL_O, t17, -, -)
+
+gcd.s:
+    addi $sp,$sp,-1
+    sw   $t7,0($sp)
+    out  $t7
+    addi $sp,$sp,1        ← argumento agora é consumido
+
+sort.tm:
+ 120: (PARAM, t57, -, -)
+ 121: (CALL_O, t57, -, -)
+
+sort.s:
+    addi $sp,$sp,-1
+    sw   $t7,0($sp)
+    out  $t7
+    addi $sp,$sp,1        ← loop não acumula mais palavras extras na pilha
+```
 
 ---
 
@@ -571,12 +602,12 @@ Tornar o tratamento de built-ins consistente:
 | 17 | ENCODER | Dot-labels (.L_eq_*) não resolvidos | encoder.c | ✅ Corrigida |
 | 18 | ASSEMBLY | Void functions sem retorno | asmgen.c/cgen.c | ✅ Corrigida |
 | 19 | ASSEMBLY | `END` gera terminação duplicada | asmgen.c/cgen.c | ✅ Corrigida |
+| 20 | ASSEMBLY | `output()` vaza pilha por `PARAM` sem consumo em `CALL_O` | cgen.c/asmgen.c | ✅ Corrigida |
 
 ### Abertas (encontradas neste re-teste)
 
 | # | Categoria | Descrição | Arquivo | Prioridade |
 |---|-----------|-----------|---------|------------|
-| 20 | ASSEMBLY | `output()` vaza pilha por `PARAM` sem consumo em `CALL_O` | cgen.c/asmgen.c | **ALTA** — pode deslocar offsets em `$sp` e quebrar execução |
 
 ### Resultado por programa
 

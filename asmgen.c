@@ -125,13 +125,20 @@ static void pushArg(FILE *o, const char *r)
     stackDelta += 1;
 }
 
+static void popArgCount(FILE *o, int count)
+{
+    if (count <= 0) return;
+    if (count > argBytes) count = argBytes;
+    if (count <= 0) return;
+
+    stackDelta -= count;
+    fprintf(o, "    addi $sp,$sp,%d\n", count);
+    argBytes -= count;
+}
+
 static void popArgs(FILE *o)
 {
-    if (argBytes) {
-        stackDelta -= argBytes;
-        fprintf(o, "    addi $sp,$sp,%d\n", argBytes);
-        argBytes = 0;
-    }
+    popArgCount(o, argBytes);
 }
 
 static void emitFunctionExit(FILE *o, const char *retReg)
@@ -504,7 +511,10 @@ void asmGen(Quadruple *q, const char *asmFile)
                 fprintf(o, "    add  %s,$v0,$zero\n", rd);
         }
         else if (!strcmp(op, "CALL_I")) fprintf(o, "    in   %s\n", rd);
-        else if (!strcmp(op, "CALL_O")) fprintf(o, "    out  %s\n", r1);
+        else if (!strcmp(op, "CALL_O")) {
+            fprintf(o, "    out  %s\n", r1);
+            popArgCount(o, 1);
+        }
 
         else if (!strcmp(op, "RET")) {
             emitFunctionExit(o, strcmp(q->arg1, "-") ? r1 : NULL);
