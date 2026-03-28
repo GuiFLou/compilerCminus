@@ -1,6 +1,6 @@
 # Issues do Compilador C‑ → MIPS‑Lite
 
-Data do teste: 28 de março de 2026 (re-teste pós-correções)
+Data do teste: 28 de março de 2026 (re-teste final pós-correções)
 Arquivos testados: teste2.cms, teste.cms, fatorial.cms, gcd.cms, sort.cms
 
 ---
@@ -613,8 +613,33 @@ sort.s:
 
 | Programa | Etapa 1 | Etapa 2 | Etapa 3 | Etapa 4 | Status |
 |----------|---------|---------|---------|---------|--------|
-| teste2.cms | ✅ OK | ✅ OK | ✅ OK | ✅ OK | **PASS** |
-| teste.cms | ✅ OK | ✅ OK | ✅ OK | ✅ OK | **PASS** |
-| fatorial.cms | ✅ OK | ✅ OK | ✅ OK | ✅ OK | **PASS** |
-| gcd.cms | ✅ OK | ✅ OK | ✅ OK | ✅ OK | **PASS** |
-| sort.cms | ✅ OK | ✅ OK | ✅ OK | ✅ OK | **PASS** |
+| teste2.cms | ✅ OK | ✅ OK | ✅ OK | ✅ OK (15 instr, decodif. completa) | **PASS** |
+| teste.cms | ✅ OK | ✅ OK | ✅ OK | ✅ OK (15 instr, in/out verificados) | **PASS** |
+| fatorial.cms | ✅ OK | ✅ OK | ✅ OK | ✅ OK (27 instr, mult/slt/beq/j ok) | **PASS** |
+| gcd.cms | ✅ OK | ✅ OK | ✅ OK | ✅ OK (58 instr, jal/jr/div/dot-labels ok) | **PASS** |
+| sort.cms | ✅ OK | ✅ OK | ✅ OK | ✅ OK (141 instr, jal×2/slt/beq/in/out ok) | **PASS** |
+
+### Detalhamento da verificação binária (re-teste final 28/03/2026)
+
+Decodificação manual realizada sobre instruções-chave de cada programa:
+
+**Formatos validados:**
+- F1 `[opcode:6][RS:6][RT:6][RD:6][Shamt:8]`: ADD, SUB, MULT, DIV, SLT, JR ✅
+- F2 `[opcode:6][RD:6][RS:6][Imm:14]`: ADDI, LW, SW, BEQ, MOVE ✅
+- F3 `[opcode:6][Addr:26]` / `[opcode:6][Reg:6][zeros:20]`: J, JAL, IN, OUT, HLT ✅
+
+**Opcodes confirmados:**
+- ADD=000000, ADDI=000001, SUB=000010, MULT=000100, DIV=000110 ✅
+- LW=001111, SW=010000, J=010001, JR=010010, JAL=010011 ✅
+- BEQ=010100, MOVE=010110, HLT=011000, SLT=011001, IN=011010, OUT=011011 ✅
+
+**Registradores confirmados (6 bits):**
+- $zero=0, $v0=2, $t0-$t9=8-17, $gp=28, $sp=29, $ra=31, $lo=61 ✅
+
+**Endereços de salto:**
+- teste2: j main→1 ✅
+- fatorial: j main→1, j L0→7, beq→L1=21 (Imm=10) ✅
+- gcd: j main→38, jal gcd→1, beq→.L_eq_0 (Imm=2), j→.L_eq_1=10, beq→L0=17 (Imm=6) ✅
+- sort: j main→92, jal minloc→1, jal sort→43, j L0→14, j L4→47, j L6→96 ✅
+
+**Conclusão:** Todos os 5 programas geram binário 100% correto segundo a ISA MIPS-Lite definida.

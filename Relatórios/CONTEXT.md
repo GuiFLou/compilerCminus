@@ -1,177 +1,352 @@
-# Contexto do compilador C‑ → MIPS-Lite (para IA)
+# Contexto do Compilador C‑ → MIPS‑Lite (para IA)
 
-Este documento descreve como o projeto do compilador funciona (ou deve funcionar), para servir de contexto a ferramentas de IA que trabalhem no código.
+Este documento descreve o compilador completo e funcionando. Todas as 20 issues foram corrigidas e validadas. Os 5 programas de teste (teste2, teste, fatorial, gcd, sort) passam em todas as 4 etapas (análise, intermediário, assembly, binário).
 
 ---
 
-## 1. Visão geral do pipeline
-
-O compilador traduz **código fonte C‑** (arquivos `.cms`) em **binário 32 bits** compatível com um processador MIPS monociclo em Verilog. O fluxo é:
+## 1. Pipeline do compilador
 
 ```
-  .cms (fonte)
+  .cms (fonte C-)
       │
       ▼
-  ┌─────────────────────────────────────────────────────────────────┐
-  │  MÓDULO DE ANÁLISE (front-end)                                   │
-  │  • Análise léxica (Flex)  →  tokens                              │
-  │  • Análise sintática (Bison)  →  árvore sintática (AST)          │
-  │  • Análise semântica  →  tabela de símbolos + erros/alertas     │
-  │  Saídas: árvore sintática e tabela de símbolos no listing        │
-  └─────────────────────────────────────────────────────────────────┘
+  ┌─────────────────────────────────────────────────────────┐
+  │  FRONT-END (análise)                                     │
+  │  Scanner.l (Flex) → tokens                               │
+  │  Parser.y (Bison) → AST (árvore sintática)               │
+  │  analyze.c → tabela de símbolos + verificação de tipos    │
+  │  Saída: stdout (árvore, tabela, erros)                   │
+  └─────────────────────────────────────────────────────────┘
       │
       ▼
-  ┌─────────────────────────────────────────────────────────────────┐
-  │  MÓDULO DE GERAÇÃO (back-end)                                    │
-  │  • Geração de código intermediário  →  quádruplas  (.tm)         │
-  │  • Geração de assembly  →  MIPS-Lite  (.s)                      │
-  │  • Montador/encoder  →  binário texto  (.mem / .txt)              │
-  └─────────────────────────────────────────────────────────────────┘
+  ┌─────────────────────────────────────────────────────────┐
+  │  BACK-END (geração)                                      │
+  │  cgen.c → quádruplas (.tm)                               │
+  │  asmgen.c → assembly MIPS-Lite (.s)                      │
+  │  encoder.c → binário 32 bits (.txt)                      │
+  └─────────────────────────────────────────────────────────┘
 ```
 
-- **Entrada:** `arquivo.cms` (subconjunto acadêmico de C).
-- **Saídas:** `arquivo.tm` (quádruplas), `arquivo.s` (assembly), `arquivo.mem` ou `arquivo.txt` (binário para ROM).
-- **Listing:** saída de diagnóstico (árvore, tabela de símbolos, tokens, etc.) vai para `stdout` por padrão.
+**Comando:** `./compilador --txt exemplos/<nome>.cms`
+
+**Saídas por programa:**
+
+| Arquivo | Conteúdo |
+|---------|----------|
+| `<nome>.tm` | Quádruplas (código intermediário) |
+| `<nome>.s` | Assembly MIPS-Lite |
+| `<nome>.txt` | Binário 32 bits (texto, uma instrução/linha) |
 
 ---
 
 ## 2. Estrutura do projeto
 
-| Arquivo        | Papel |
-|----------------|--------|
-| `main.c`       | CLI (aceita `--txt` e caminho do `.cms`), orquestra análise e geração. |
-| `Scanner.l`    | Especificação Flex: análise léxica. |
-| `Parser.y`     | Especificação Bison: análise sintática e construção da AST. |
-| `Parser.tab.c`, `Parser.tab.h` | Gerados por Bison a partir de `Parser.y`. |
-| `lex.yy.c`     | Gerado por Flex a partir de `Scanner.l`. |
-| `globals.h`    | Tipos compartilhados (tokens, `TreeNode`, flags, etc.). |
-| `parse.h`      | Declaração de `parse()` e `yyerror()`. |
-| `scan.h`       | Declaração de `getToken()`, `tokenString`, `MAXTOKENLEN`. |
-| `util.c`, `util.h` | Árvore (novos nós, cópia de string, `printTree`, `aggScope`). |
-| `symtab.c`, `symtab.h` | Tabela de símbolos (hash), inserção/consulta, built-ins, impressão. |
-| `analyze.c`, `analyze.h` | Análise semântica: construção da tabela e verificação de tipos. |
-| `cgen.c`, `cgen.h` | Geração de quádruplas a partir da AST e orquestração do back-end. |
-| `asmgen.c`, `asmgen.h` | Tradução de quádruplas para assembly MIPS-Lite (`.s`). |
-| `encoder.c`, `encoder.h` | Montador: assembly (`.s`) → binário (`.mem`/`.txt`). |
-| `Makefile`     | Build (espera que `Parser.tab.c` e `lex.yy.c` já existam ou sejam gerados com Flex/Bison). |
+| Arquivo | Papel |
+|---------|-------|
+| `main.c` | CLI (`--txt` + caminho), orquestra análise e geração |
+| `Scanner.l` | Flex: análise léxica |
+| `Parser.y` | Bison: análise sintática, construção da AST |
+| `globals.h` | Tipos compartilhados (TreeNode, tokens, flags) |
+| `util.c/h` | Criação de nós, `printTree`, `aggScope` |
+| `symtab.c/h` | Tabela de símbolos (hash), inserção/consulta, built-ins |
+| `analyze.c/h` | Análise semântica: tabela + verificação de tipos |
+| `cgen.c/h` | Geração de quádruplas a partir da AST |
+| `asmgen.c/h` | Tradução de quádruplas → assembly MIPS-Lite |
+| `encoder.c/h` | Montador: assembly → binário 32 bits |
 
 ---
 
-## 3. Módulo de análise
-
-### 3.1 Análise léxica (Scanner.l)
-
-- **Ferramenta:** Flex.
-- **Saída:** sequência de tokens para o parser.
-- **Tokens:** palavras reservadas (`if`, `else`, `int`, `return`, `void`, `while`), operadores e delimitadores (`=`, `==`, `<`, `>`, `<=`, `>=`, `!=`, `[`, `]`, `{`, `}`, `+`, `-`, `*`, `/`, `(`, `)`, `;`, `,`), `NUM` (inteiros), `ID` (identificadores), comentários `/* ... */`, newline (atualiza `lineno`).
-- **Interface:** `getToken()` (em `Scanner.l`) retorna o próximo `TokenType` e preenche `tokenString`; usa `source` e `listing` globais; com `TraceScan` ativo, imprime cada token no listing.
-
-### 3.2 Análise sintática (Parser.y)
-
-- **Ferramenta:** Bison.
-- **Valor semântico:** `YYSTYPE` = `TreeNode *` (ponteiro para nó da árvore).
-- **Gramática:** programa = lista de declarações; declarações = variáveis (`int id;`, `int id[N];`) e funções (`int id(params) { ... }`, `void id(params) { ... }`); parâmetros; corpo com declarações locais e lista de statements; statements = expressões, blocos, `if`/`if-else`, `while`, `return`; expressões com atribuição, operadores relacionais e aritméticos; variáveis escalares e indexadas (`id[exp]`); chamadas de função.
-- **Árvore:** cada nó é `TreeNode` (`globals.h`): `NodeKind` (StmtK, ExpK), para StmtK usa `StmtKind` (IfK, whileK, AssignK, variableK, functionK, callK, returnK, numberK), para ExpK usa `ExpKind` (OpK, ConstK, IdK, vectorK, vectorIdK, typeK); até 3 filhos e lista de irmãos (`sibling`); atributos como `attr.op`, `attr.val`, `attr.name`, `attr.len`, `attr.scope`; campo `type` para análise semântica (`ExpType`: voidK, integerK, booleanK).
-- **Escopo:** na regra de função, `aggScope()` (em `util.c`) propaga o nome da função como `scope` para parâmetros e corpo.
-- **Saída do parser:** árvore sintática cuja raiz é retornada por `parse()` (`savedTree`).
-- **Erros:** `yyerror()` imprime “Syntax error at line …” e seta `Error = TRUE`.
-
-### 3.3 Análise semântica (analyze.c, symtab.c)
-
-- **Tabela de símbolos:** hash com escopo (`symtab.c`). Cada entrada: nome, linha(s), `memloc`, escopo, `typeID` (e.g. "variable", "function", "call"), `typeData` (e.g. "integer", "void").
-- **Inicialização:** `symtabInit()` zera a tabela e insere built-ins: `input` (integer) e `output` (void com um int).
-- **Construção da tabela:** `buildSymtab(syntaxTree)` faz uma passagem em pré-ordem (com `traverse(..., insertNode, nullProc)`). Para cada nó:
-  - **variableK / functionK:** insere no escopo atual; se já existir (no escopo ou em global), erro “Invalid Declaration. Already declared.”
-  - **callK:** verifica se o nome existe (escopo local ou global); senão, “Invalid Call. It was not declared.”
-  - **vectorK / vectorIdK:** verifica se o vetor foi declarado.
-- **Pós-condição:** exige que exista `main` em escopo global; caso contrário, “main was not declared”.
-- **Verificação de tipos:** `typeCheck(syntaxTree)` faz passagem em pós-ordem (com `traverse(..., nullProc, checkNode)`). Regras relevantes:
-  - Condição de `if` deve ser booleana (não inteira).
-  - Atribuição de retorno de função `void` a variável é erro (“assignment of void return”).
-- **Listing:** com `TraceAnalyze`, imprime “Building Symbol Table…”, “Checking Types…”, “Type Checking Finished” e a tabela de símbolos formatada.
-
----
-
-## 4. Módulo de geração
-
-### 4.1 Geração de código intermediário (cgen.c)
-
-- **Representação:** quádruplas `(op, arg1, arg2, result)` em lista encadeada (`Quadruple`), campos string (ex.: `op[10]`, `arg1[32]`, etc.).
-- **Operações emitidas:**  
-  **Declaração/alocação:** `ALLOC name scope -` para variáveis.  
-  **Função:** `FUN tipo name -`, depois `ARGS` (se houver parâmetros), corpo, `END name - -`.  
-  **Expressões:** `ASSIGN lit - dst`, `LOAD name - dst`, `LOADV name idx dst`, `ADD/SUB/MUL/DIV a b dst`.  
-  **Atribuição:** `STORE rhs - name`, `STOREV rhs idx name`.  
-  **Controle:** `IFF cond label -`, `GOTO label - -`, `LAB label - -`.  
-  **Chamadas:** `PARAM arg - -`, `CALL name nargs result` (ou `-` se void), `CALL_I` (input → temp), `CALL_O` (output com um argumento).  
-  **Retorno:** `RET value - -` ou `RET - - -`.  
-  **Fim:** `HALT - - -`.
-- **Temporários e labels:** `newTemp()` → `t0`, `t1`, …; `newLabel()` → `L0`, `L1`, …
-- **Fluxo:** `codeGen(syntaxTree, base)` zera lista e contadores, percorre a raiz (e irmãos) com `genStmt`, emite `HALT`, grava as quádruplas em `<base>.tm`, chama `asmGen(quadList, <base>.s)` e `encodeAsm(<base>.s, <base>.mem)`.
-- **Observação:** apenas o primeiro nó da raiz é percorrido (`TreeNode *n = syntaxTree; genStmt(n);`); declarações no topo (variáveis globais, funções) são tratadas como irmãos desse nó, então o projeto pode precisar iterar sobre `syntaxTree` e seus `sibling` para gerar código de todas as funções (como no comentário “percorre TODAS as funções ligadas por sibling”).
-
-### 4.2 Geração de assembly (asmgen.c)
-
-- **Entrada:** lista de quádruplas.
-- **Saída:** arquivo `.s` com assembly MIPS-Lite (texto).
-- **Registradores:** temporários lógicos `t0`–`t9` mapeados para `$t0`–`$t9`; uso de `$gp`, `$sp`, `$ra`, `$v0`, `$zero`.
-- **Mapeamento de quádruplas:**  
-  - ALU: ADD, SUB → `add`/`sub`; MUL → `mult r1,r2` + `move rd,$lo` (ISA escreve em High/Low); DIV → `div r1,r2` + `move rd,$lo` (quociente em Low); ASSIGN (literal ou cópia) → `addi` ou `add` com `$zero`. Resto no .tm é `u - (u/v)*v` (DIV + MUL + SUB).  
-  - Memória: LOAD/STORE → `lw`/`sw` com `name($gp)`; LOADV/STOREV → cálculo de endereço com `sll` (índice*4) e `$gp`.  
-  - Controle: IFF → `beq cond, $zero, label`; GOTO → `j label`; LAB → `label:`.  
-  - Funções: PARAM → push na pilha (`addi $sp,$sp,-1`; `sw`); CALL → `jal` + pop de argumentos; RET → `add $v0,...` (se valor) e `jr $ra`; CALL_I → `in`; CALL_O → `out`.  
-  - HALT → `hlt`.
-- **Observação sobre endereçamento:** LOAD/STORE usam o **nome** da variável no assembly (ex.: `lw $t0, n($gp)`). O encoder atual não resolve símbolos de dados; ele interpreta o “offset” como número. Para gerar binário correto, é necessário ou (1) emitir o **offset** (`memloc` da tabela de símbolos) em vez do nome no asmgen, ou (2) fazer o encoder resolver nomes de variáveis a partir de uma tabela de símbolos de dados.
-
-### 4.3 Encoder / montador (encoder.c)
-
-- **Entrada:** arquivo **assembly** (`.s`), não `.tm`.
-- **Saída:** arquivo binário (`.mem` ou `.txt`) com uma palavra de 32 bits por linha, em **texto** (caracteres `0` e `1`).
-- **Importante (PC no .txt):** como a ROM/memória de instrução é alimentada com **uma word por linha** do `.mem`/`.txt`, o endereço/PC efetivo para “próxima instrução” deve considerar **incremento unitário** (**PC ← PC + 1** em *words*), e não o padrão do MIPS byte-addressed (**PC ← PC + 4**). Isso afeta o entendimento de “endereço”/“posição” ao resolver labels e offsets de desvio.
-- **Formato de instrução:** três formatos (F1, F2, F3) com opcode em 6 bits e campos conforme o ISA (rd, rs, rt, imediato, endereço). Mnemônicos mapeados incluem: ADD, ADDI, SUB, SUBI, MULT/mul, DIV, AND, OR, NOT, SR/SRL/srl, SL/SLL/sll, LOAD/lw, STORE/sw, JUMP/j, JUMPR/jr, JAL, BEQ, BNE, MOVE, NOP, HLT, SLT, IN, OUT.
-- **Duas passagens:** primeira passagem coleta rótulos e endereços; segunda passagem monta cada instrução e resolve referências a labels (saltos relativos quando aplicável).
-- **Registradores:** `$zero`=0, `$sp`=29, `$gp`=28, `$ra`=31, `$hi`=62, `$lo`=61, `$t0`–`$t9`=8–17 (mapeamento interno). DIV/MULT com dois operandos montam F1 com RD=0 (resultado em High/Low).
-
----
-
-## 5. Fluxo em main.c
-
-1. Parse de argumentos: opção `--txt` e caminho do arquivo; se não houver extensão, acrescenta `.cms`.
-2. Abre o arquivo fonte, define `listing = stdout`, imprime “C- COMPILATION: …”.
-3. **Se NO_PARSE:** apenas chama `getToken()` em loop até ENDFILE (só scanner).
-4. **Caso contrário:**  
-   - Chama `parse()` → árvore sintática.  
-   - Se `TraceParse`: imprime “Syntax tree:” e `printTree(syntaxTree)`.  
-   - **Se !NO_ANALYZE e !Error:**  
-     - `buildSymtab(syntaxTree)`; se `TraceAnalyze`, imprime mensagens e tabela.  
-     - `typeCheck(syntaxTree)`.  
-   - **Se !NO_CODE e !Error:**  
-     - Abre `<base>.tm` em `code`.  
-     - `codeGen(syntaxTree, base)` (gera `.tm`, `.s` e `.mem`).  
-     - Fecha `code`.  
-     - Se `--txt`, renomeia `<base>.mem` para `<base>.txt`.
-5. Fecha o arquivo fonte; retorna 0.
-
-Flags de controle (em `main.c`): `NO_PARSE`, `NO_ANALYZE`, `NO_CODE` (todas FALSE por padrão); `EchoSource`, `TraceScan`, `TraceParse`, `TraceAnalyze`, `TraceCode` (todas TRUE por padrão). `Error` é setado por erros sintáticos ou semânticos e impede a geração de código.
-
----
-
-## 6. Linguagem C‑ (arquivos .cms)
+## 3. Linguagem C‑
 
 - **Tipos:** `int`, `void`. Variáveis escalares e vetores `int id[N]`.
-- **Funções:** retorno `int` ou `void`; parâmetros podem ser `int id` ou `int id[]`.
-- **Built-ins:** `input()` (retorna int) e `output(int)`; devem estar na tabela global (inseridas em `symtabInit`) ou declaradas como stub no fonte (ex.: `void output(int x) { }`).
-- **Obrigatório:** função `main` sem parâmetros (void ou int).
-- **Gramática:** não aceita apenas protótipo de função (ex.: `void foo(int);`); é necessário corpo `{ }`.
+- **Funções:** retorno `int` ou `void`; parâmetros `int id` ou `int id[]`.
+- **Built-ins:** `input()` (retorna int) e `output(int)`.
+- **Obrigatório:** função `main(void)`.
 
 ---
 
-## 7. Pontos úteis para manutenção e IA
+## 4. Geração de código intermediário (cgen.c)
 
-- **Parser.tab.c / lex.yy.c:** gerados por Bison e Flex; não editar à mão. Comandos típicos: `bison -d Parser.y`, `flex Scanner.l`.
-- **Convenção de nomes:** variáveis na tabela de símbolos têm `memloc`; esse valor pode ser usado no back-end para emitir offset em LOAD/STORE em vez do nome, se o encoder não resolver símbolos.
-- **Erros semânticos:** códigos mencionados no código (ex.: “Error 1”, “Error 4”, “Error 5”) indicam “não declarado”, “declaração inválida (já declarado)” e “chamada inválida (não declarado)”.
-- **Quádruplas:** o formato `.tm` é texto, uma quádrupla por linha (op, arg1, arg2, result), numeradas a partir de 0; útil para depuração e para entender a IR antes do assembly.
-- **Binário final:** uma linha por palavra de 32 bits (0/1), pronto para carregar na ROM (ex.: ModelSim/FPGA com `load_mem.do`).
+### 4.1 Quádruplas emitidas
 
-Este documento reflete o estado do código no repositório e pode ser expandido com detalhes do ISA (opcodes, formatos F1/F2/F3) ou da convenção de chamada (pilha, $ra, $v0) conforme necessário.
+Cada quádrupla tem formato `(op, arg1, arg2, result)`. Temporários: `t0`, `t1`, ... Labels: `L0`, `L1`, ...
+
+| Quádrupla | Significado |
+|-----------|-------------|
+| `GOTO main - -` | Salto inicial para main |
+| `FUN tipo nome -` | Início de função |
+| `ARG tipo nome funcao` | Parâmetro formal |
+| `END nome - -` | Fim de função |
+| `ALLOC nome escopo -` | Variável escalar |
+| `ALLOC nome escopo tamanho` | Vetor (ex: `ALLOC vet global 10`) |
+| `ASSIGN lit - tN` | Carrega literal em temporário |
+| `LOAD var - tN` | Carrega variável em temporário |
+| `STORE tN - var` | Armazena temporário em variável |
+| `LOADV arr idx tN` | Carrega `arr[idx]` em temporário |
+| `STOREV val idx arr` | Armazena `val` em `arr[idx]` |
+| `ADDR arr - tN` | Endereço base do vetor (para passagem por referência) |
+| `ADD a b dst` | Soma |
+| `SUB a b dst` | Subtração |
+| `MUL a b dst` | Multiplicação |
+| `DIV a b dst` | Divisão (quociente) |
+| `SLT a b dst` | Menor que (`<`) |
+| `EQ a b dst` | Igual (`==`) |
+| `NEQ a b dst` | Diferente (`!=`) |
+| `IFF cond label -` | Branch se falso |
+| `GOTO label - -` | Salto incondicional |
+| `LAB label - -` | Definição de label |
+| `PARAM arg - -` | Empilha argumento para chamada |
+| `CALL nome nargs tN` | Chamada de função (resultado em tN) |
+| `CALL_I - - tN` | Chamada de `input()` |
+| `CALL_O val - -` | Chamada de `output()` (precedido de PARAM) |
+| `RET val - -` | Retorno de função |
+| `HALT - - -` | Fim do programa |
+
+### 4.2 Fluxo
+
+1. `codeGen` emite `GOTO main` no início
+2. Percorre toda a AST (siblings) gerando quádruplas
+3. Emite `HALT` ao final
+4. Grava `.tm`, chama `asmGen` (→ `.s`), chama `encodeAsm` (→ `.txt`)
+
+### 4.3 Exemplo: fatorial.tm
+
+```
+  0: (GOTO, main, -, -)
+  1: (FUN, void, main, -)
+  2: (ALLOC, n, main, -)
+  3: (ALLOC, result, main, -)
+  4: (ASSIGN, 5, -, t0)
+  5: (STORE, t0, -, n)
+  6: (ASSIGN, 1, -, t1)
+  7: (STORE, t1, -, result)
+  8: (LAB, L0, -, -)
+  9: (LOAD, n, -, t2)
+ 10: (ASSIGN, 0, -, t3)
+ 11: (SLT, t3, t2, t4)         ← n > 0 implementado como 0 < n
+ 12: (IFF, t4, L1, -)
+ 13: (LOAD, result, -, t5)
+ 14: (LOAD, n, -, t6)
+ 15: (MUL, t5, t6, t7)
+ 16: (STORE, t7, -, result)
+ 17: (LOAD, n, -, t8)
+ 18: (ASSIGN, 1, -, t9)
+ 19: (SUB, t8, t9, t10)
+ 20: (STORE, t10, -, n)
+ 21: (GOTO, L0, -, -)
+ 22: (LAB, L1, -, -)
+ 23: (LOAD, result, -, t11)
+ 24: (PARAM, t11, -, -)
+ 25: (CALL_O, t11, -, -)
+ 26: (END, main, -, -)
+ 27: (HALT, -, -, -)
+```
+
+---
+
+## 5. Geração de assembly (asmgen.c)
+
+### 5.1 Convenções implementadas
+
+**Registradores utilizados:**
+- `$t0`–`$t9`: temporários (mapeados circularmente de `tN` do intermediário)
+- `$gp`: base da memória de dados (variáveis globais e locais não-parâmetro)
+- `$sp`: ponteiro de pilha (parâmetros, $ra, argumentos de chamada)
+- `$ra`: endereço de retorno
+- `$v0`: valor de retorno de funções int
+- `$zero`: registrador zero
+- `$lo`: resultado de mult/div (parte baixa)
+- `$hi`: resultado de mult/div (parte alta, não usado atualmente)
+
+**Acesso a memória:**
+- Variáveis globais e locais: `offset($gp)` — offset = `memloc` da tabela de símbolos
+- Parâmetros de função: `offset($sp)` — offset calculado dinamicamente com `stackDelta`
+- Vetores globais: `addi base,$gp,memloc` + `add addr,base,index` + `lw/sw 0(addr)`
+- Vetores parâmetro: `lw base,offset($sp)` + `add addr,base,index` + `lw/sw 0(addr)`
+
+**Convenção de chamada:**
+1. Prologue da função: `addi $sp,$sp,-1` + `sw $ra,0($sp)`
+2. Chamada (caller): push de argumentos com PARAM → `addi $sp,-1` + `sw arg,0($sp)`
+3. `jal funcao`
+4. Pop de argumentos: `addi $sp,$sp,N`
+5. Retorno em `$v0`: `add result,$v0,$zero`
+6. Epilogue: `lw $ra,0($sp)` + `addi $sp,$sp,1` + `jr $ra`
+7. main termina com `hlt` em vez de `jr $ra`
+
+**Operações especiais:**
+- `MUL` → `mult r1,r2` + `move rd,$lo` (2 operandos, resultado em $lo)
+- `DIV` → `div r1,r2` + `move rd,$lo` (quociente em $lo)
+- `EQ` → `sub` + `beq` + dot-labels (`.L_eq_N`) para resultado 0/1
+- `NEQ` → `sub` + `beq` + dot-labels (`.L_ne_N`) para resultado 1/0
+- `SLT` → `slt rd,r1,r2` (diretamente)
+- `>` → `slt` com operandos invertidos
+- `IFF` → `beq cond,$zero,label`
+- `GOTO` → `j label`
+- `CALL_I` → `in rd`
+- `CALL_O` → `out r1` + pop do argumento empilhado por PARAM
+
+**Controle de fluxo redundante:**
+- END de funções com todos os caminhos terminando em RET: não emite epilogue duplicado (análise de alcançabilidade via `functionEndIsReachable`)
+- END de funções void sem return explícito: emite epilogue implícito
+- HALT suprimido se main já emitiu `hlt` via END/RET
+
+### 5.2 Exemplo: fatorial.s
+
+```asm
+# Assembly gerado automaticamente
+.text
+.globl main
+    j    main
+main:
+    addi $sp,$sp,-1
+    sw   $ra,0($sp)
+    addi $t0,$zero,5
+    sw   $t0,1($gp)
+    addi $t1,$zero,1
+    sw   $t1,2($gp)
+L0:
+    lw   $t2,1($gp)
+    addi $t3,$zero,0
+    slt  $t4,$t3,$t2
+    beq  $t4,$zero,L1
+    lw   $t5,2($gp)
+    lw   $t6,1($gp)
+    mult $t5,$t6
+    move $t7,$lo
+    sw   $t7,2($gp)
+    lw   $t8,1($gp)
+    addi $t9,$zero,1
+    sub  $t0,$t8,$t9
+    sw   $t0,1($gp)
+    j    L0
+L1:
+    lw   $t1,2($gp)
+    addi $sp,$sp,-1
+    sw   $t1,0($sp)
+    out  $t1
+    addi $sp,$sp,1
+    # END main
+    hlt
+```
+
+---
+
+## 6. Encoder / Montador (encoder.c)
+
+### 6.1 Funcionamento
+
+Duas passagens sobre o `.s`:
+1. **1ª passagem:** coleta labels (incluindo dot-labels `.L_eq_*`, `.L_ne_*`) e seus endereços
+2. **2ª passagem:** monta cada instrução em 32 bits segundo o formato do ISA
+
+### 6.2 Formatos implementados
+
+**F1** (Register): `[opcode:6][RS:6][RT:6][RD:6][Shamt:8]` = 32 bits
+- Usado por: ADD, SUB, MULT, DIV, AND, OR, SLT, SR, SL, JR
+
+**F2** (Immediate): `[opcode:6][RD:6][RS:6][Imm:14]` = 32 bits
+- Usado por: ADDI, SUBI, LW, SW, BEQ, BNE, MOVE, NOT
+
+**F3** (Jump): `[opcode:6][Endereço:26]` = 32 bits
+- Usado por: J, JAL, NOP, HLT
+
+**FI** (I/O): `[opcode:6][Reg:6][zeros:20]` = 32 bits
+- Usado por: IN, OUT
+
+### 6.3 Tratamentos especiais
+
+- **MULT/DIV** com 2 operandos: monta F1 com RS=op1, RT=op2, RD=0 (resultado em $hi/$lo)
+- **JR** com 1 operando: monta F1 com RS=op1, RT=0, RD=0
+- **BEQ/BNE** com label: offset relativo = `addr(label) - PC - 1`
+- **J/JAL** com label: endereço absoluto do label (26 bits)
+- **LW/SW** com sintaxe `offset(base)`: parser separa imediato e registrador base
+- **Dot-labels** (`.L_eq_*`, `.L_ne_*`): reconhecidos e resolvidos normalmente
+- **Diretivas** (`.text`, `.globl`): ignoradas (não contam como instrução)
+- **Comentários** (`#`): ignorados
+
+### 6.4 Mapeamento de registradores
+
+| Registrador | Número (6 bits) |
+|-------------|-----------------|
+| `$zero` | 0 (000000) |
+| `$v0` | 2 (000010) |
+| `$t0`–`$t9` | 8–17 (001000–010001) |
+| `$gp` | 28 (011100) |
+| `$sp` | 29 (011101) |
+| `$ra` | 31 (011111) |
+| `$lo` | 61 (111101) |
+| `$hi` | 62 (111110) |
+
+### 6.5 Tabela de opcodes
+
+| Instrução | Opcode | Formato | Instrução | Opcode | Formato |
+|-----------|--------|---------|-----------|--------|---------|
+| ADD | 000000 | F1 | Or | 001010 | F1 |
+| AddI | 000001 | F2 | OrI | 001011 | F2 |
+| Sub | 000010 | F1 | Not | 001100 | F2 |
+| SubI | 000011 | F2 | Sr | 001101 | F1 |
+| Mult | 000100 | F1 | Sl | 001110 | F1 |
+| Multi | 000101 | F2 | Load/lw | 001111 | F2 |
+| Div | 000110 | F1 | Store/sw | 010000 | F2 |
+| Divi | 000111 | F2 | Jump/j | 010001 | F3 |
+| And | 001000 | F1 | JumpR/jr | 010010 | F1 |
+| AndI | 001001 | F2 | Jal | 010011 | F3 |
+| beq | 010100 | F2 | move | 010110 | F2 |
+| bne | 010101 | F2 | nop | 010111 | F3 |
+| hlt | 011000 | F3 | slt | 011001 | F1 |
+| In | 011010 | FI | Out | 011011 | FI |
+
+---
+
+## 7. Tamanho dos programas gerados
+
+| Programa | Quádruplas | Instruções assembly | Instruções binárias |
+|----------|-----------|--------------------|--------------------|
+| teste2.cms | 15 | 17 | 15 |
+| teste.cms | 15 | 17 | 15 |
+| fatorial.cms | 28 | 31 | 27 |
+| gcd.cms | 42 | 66 | 58 |
+| sort.cms | 130 | 157 | 141 |
+
+---
+
+## 8. Memória de dados — layout via $gp
+
+O `$gp` aponta para o início da memória de dados. Cada variável global ou local (exceto parâmetros) recebe um offset fixo (`memloc`) da tabela de símbolos.
+
+**Exemplo — sort.cms:**
+```
+$gp + 0..9  → vet[10] (vetor global, 10 palavras)
+$gp + 10    → (início das variáveis de minloc, mas acessadas durante execução de minloc)
+...
+$gp + 25    → i de main
+```
+
+Parâmetros de função ficam na pilha (`$sp`), não em `$gp`.
+
+---
+
+## 9. Pilha ($sp) — layout durante chamada
+
+```
+Antes da chamada:
+    [...conteúdo anterior...]
+    $ra do chamador ← 0($sp)
+
+Após push de N argumentos:
+    argN                    ← 0($sp)
+    argN-1                  ← 1($sp)
+    ...
+    arg1                    ← (N-1)($sp)
+    $ra do chamador         ← N($sp)
+
+Dentro do callee (após prologue salvar $ra):
+    $ra do callee           ← 0($sp)
+    argN (último param)     ← 1($sp)
+    argN-1                  ← 2($sp)
+    ...
+    arg1 (primeiro param)   ← N($sp)
+    $ra do chamador         ← (N+1)($sp)
+```
+
+O `stackDelta` em `asmgen.c` rastreia quantas palavras o callee empilhou desde a entrada, ajustando automaticamente os offsets de parâmetros quando argumentos de subchamadas são empilhados.

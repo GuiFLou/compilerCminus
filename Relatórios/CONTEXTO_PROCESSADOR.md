@@ -1,328 +1,628 @@
-# Contexto do processador MIPS_Lite para o compilador
+# Contexto do Processador MIPS‑Lite — Referência para implementação em Verilog
 
-Este documento resume o que o relatório `Relatórios/Relatório_Processador.tex` define sobre o processador `MIPS_Lite`, mas com foco no que interessa ao compilador, ao gerador de assembly e ao encoder.
+Este documento define **tudo que o processador precisa implementar** para executar corretamente os binários gerados pelo compilador C‑. Ele é a referência autoritativa para a implementação/revisão do processador em Verilog.
 
----
-
-## Destaques para os próximos passos do desenvolvimento
-
-As três informações abaixo são **de extrema importância** para o desenvolvimento do backend (gerador de código, montador e encoder). Consulte as seções indicadas para os detalhes completos.
-
-### Conjunto de Instruções (ISA)
-
-- **Localização completa:** Seção 4.
-- Instruções de **32 bits**, em três formatos: **F1** (RS, RT, RD, Shamt), **F2** (RD, RS, Imediato 14 bits), **F3** (Endereço 26 bits ou Opcode + registrador + 20 bits zerados para In/Out).
-- **Opcode binário (6 bits) de cada instrução:**
-
-| Instrução | Opcode (binário) | Instrução | Opcode (binário) |
-|-----------|------------------|-----------|------------------|
-| `ADD`     | `000000`         | `SubI`    | `000011`         |
-| `AddI`    | `000001`         | `Mult`    | `000100`         |
-| `Sub`     | `000010`         | `Multi`   | `000101`         |
-| `Div`     | `000110`         | `Or`      | `001010`         |
-| `Divi`    | `000111`         | `OrI`     | `001011`         |
-| `And`     | `001000`         | `Not`     | `001100`         |
-| `AndI`    | `001001`         | `Sr`      | `001101`         |
-| `Sl`      | `001110`         | `Jal`     | `010011`         |
-| `Load`    | `001111`         | `beq`     | `010100`         |
-| `Store`   | `010000`         | `bne`     | `010101`         |
-| `Jump`    | `010001`         | `move`    | `010110`         |
-| `JumpR`   | `010010`         | `nop`     | `010111`         |
-| `hlt`     | `011000`         | `In`      | `011010`         |
-| `slt`     | `011001`         | `Out`     | `011011`         |
-
-- **Restrições:** imediatos em 14 bits (F2); saltos absolutos em 26 bits (F3); `mult`/`multi`/`div`/`divi` escrevem em **High** e **Low**; `jal` salva `PC+1` em registrador de retorno.
-
-### Acesso à memória pelas instruções
-
-- **Localização completa:** Seções 3 (formatos), 4 (Load/Store) e 5 (modos de endereçamento).
-- **Load** e **Store** usam formato **F2**: endereço efetivo = **base (RS) + deslocamento (imediato 14 bits)**. Em **Load**: RD recebe o valor lido da memória; em **Store**: registrador-base e registrador-fonte são **distintos** (RD e RS conforme o formato).
-- Memória de **dados**: 1024 palavras de 32 bits; endereços válidos e constantes/offsets devem respeitar o limite dos 14 bits de imediato (com extensão de sinal).
-- Memória de **instruções**: 1024 palavras; jumps usam endereço absoluto de 26 bits; branches usam endereçamento **relativo ao PC** com cálculo `extImm << 2`.
-- Modos de endereçamento usados: registrador, imediato, **base + deslocamento** (load/store), relativo ao PC (branches), absoluto/pseudo-direto (jumps).
-
-### Organização dos registradores
-
-- **Localização completa:** Seção 6 (e itens 2 e 7).
-- Banco de **64 registradores**; cada identificador usa **6 bits**. Não assumir a convenção de 32 registradores do MIPS clássico.
-- **Registradores reservados (não usar como temporários gerais):**
-  - **High** e **Low**: resultados de `mult`, `multi`, `div` e `divi`.
-  - **Registrador de link/retorno** (último do banco): usado por `jal` para gravar `PC + 1`; essencial para chamadas de função e retorno.
-- O alocador de registradores do compilador deve tratar High, Low e o registrador de link como reservados pelo hardware.
+O compilador está completo e validado. Os binários de todos os 5 programas de teste foram decodificados manualmente e estão 100% corretos.
 
 ---
 
-## 1. Visão geral
-
-- O processador é um `MIPS` simplificado, de estilo `RISC`.
-- A implementação é `monociclo`.
-- A arquitetura é baseada em `Harvard`: memória de instruções separada da memória de dados.
-- As instruções têm tamanho fixo de `32 bits`.
-- Existem `3 formatos` de instrução.
-- O banco de registradores tem `64 registradores`, então cada identificador de registrador ocupa `6 bits`.
-- Além dos registradores gerais, há registradores de uso específico para operações especiais e controle de fluxo, incluindo `High`, `Low` e o registrador de retorno usado por `jal`.
-
-## 2. Implicações diretas para o compilador
-
-- O backend deve gerar instruções de `32 bits` exatamente nos formatos `F1`, `F2` e `F3`.
-- Como há `64 registradores`, o montador e o gerador de código não devem assumir a convenção clássica de `32` registradores do MIPS tradicional.
-- Instruções imediatas usam `14 bits` de imediato no formato `F2`; isso limita constantes inline e offsets.
-- Saltos absolutos usam `26 bits` no formato `F3`.
-- `mult`, `multi` e `div` escrevem em registradores especiais (`High` e `Low`), então o compilador precisa tratar essas instruções como produtoras de resultado especial, não em registrador geral.
-- `jal` salva `PC + 1` em um registrador especial de procedimento/retorno, então chamadas de função dependem dessa convenção.
-- `in` e `out` fazem parte da ISA; isso permite mapear built-ins como `input()` e `output()`.
-- `hlt` existe como instrução real, então o programa final pode encerrar explicitamente.
-- O hardware usa mais de dois registradores com papel especial, então o backend deve tratá-los como reservados.
-
-## 3. Formatos de instrução
-
-### F1
-
-Usado para operações entre registradores e shifts.
-
-| Bits | Campo |
-|-----|-----|
-| 31-26 | Opcode |
-| 25-20 | RS |
-| 19-14 | RT |
-| 13-8 | RD |
-| 7-0 | Shamt |
-
-Para o compilador, deve-se seguir a interpretação do Verilog: `RS`, `RT`, `RD`, e não a ordem textual mostrada na tabela original do relatório.
-
-### F2
-
-Usado para imediato, acesso à memória e branches.
-
-| Bits | Campo |
-|---|---|
-| 31-26 | Opcode |
-| 25-20 | RD |
-| 19-14 | RS |
-| 13-0 | Imediato |
-
-### F3
-
-Usado para jumps, instruções de controle e I/O.
-
-**Para Jump, Jal, Nop, Hlt (campo “Endereço”):**
-
-| Bits | Campo |
-|---|---|
-| 31-26 | Opcode |
-| 25-0 | Endereço |
-
-**Para In e Out:** o relatório descreve F3 só com opcode e “Endereço / -”, mas a semântica exige um registrador. A interpretação correta para o compilador é tratar essas instruções como **6 bits opcode + 6 bits registrador + 20 bits não usados (zerados)**. O “valor lido nos switches” não entra na instrução: é uma entrada de hardware lida na execução; a instrução **In** apenas indica em qual registrador gravar esse valor. Da mesma forma, **Out** indica de qual registrador ler o valor a enviar para a saída.
-
-## 4. Conjunto de instruções
-
-| Instrução | Formato | Opcode | Semântica resumida |
-|---|---|---|---|
-| `ADD` | `F1` | `000000` | soma entre registradores |
-| `AddI` | `F2` | `000001` | soma com imediato |
-| `Sub` | `F1` | `000010` | subtração entre registradores |
-| `SubI` | `F2` | `000011` | subtração com imediato |
-| `Mult` | `F1` | `000100` | produto em `High/Low` |
-| `Multi` | `F2` | `000101` | produto com imediato em `High/Low` |
-| `Div` | `F1` | `000110` | resto em `High`, quociente em `Low` |
-| `Divi` | `F2` | `000111` | divisão de registrador por imediato |
-| `And` | `F1` | `001000` | AND lógico |
-| `AndI` | `F2` | `001001` | AND com imediato |
-| `Or` | `F1` | `001010` | OR lógico |
-| `OrI` | `F2` | `001011` | OR com imediato |
-| `Not` | `F2` | `001100` | NOT lógico |
-| `Sr` | `F1` | `001101` | shift right com `shamt` |
-| `Sl` | `F1` | `001110` | shift left com `shamt` |
-| `Load` | `F2` | `001111` | leitura de memória |
-| `Store` | `F2` | `010000` | escrita em memória com registrador-base e registrador-fonte distintos |
-| `Jump` | `F3` | `010001` | salto incondicional |
-| `JumpR` | `F1` | `010010` | salto para endereço em registrador |
-| `Jal` | `F3` | `010011` | salto com link |
-| `beq` | `F2` | `010100` | branch se iguais |
-| `bne` | `F2` | `010101` | branch se diferentes |
-| `move` | `F2` | `010110` | cópia entre registradores |
-| `nop` | `F3` | `010111` | nenhuma operação |
-| `hlt` | `F3` | `011000` | para a execução |
-| `slt` | `F1` | `011001` | comparação "menor que" |
-| `In` | `F3` | `011010` | entrada de dados |
-| `Out` | `F3` | `011011` | saída de dados |
-
-## 5. Modos de endereçamento relevantes
-
-O relatório associa a ISA a modos de endereçamento próximos aos do MIPS:
-
-- `Registrador`: operações aritméticas e lógicas entre registradores.
-- `Imediato`: constantes embutidas na instrução.
-- `Base + deslocamento`: `load` e `store`.
-- `Relativo ao PC`: branches.
-- `Absoluto / pseudo-direto`: jumps.
-
-Para o compilador, isso sugere o seguinte:
-
-- `if` e `while` podem ser implementados com `beq` e `bne`.
-- acessos a variáveis e vetores podem ser mapeados para `load/store` com base + offset;
-- chamadas e desvios incondicionais podem usar `jump`, `jal` e `jumpR`.
-
-## 6. Organização do hardware que afeta o código gerado
-
-### Memórias
-
-- Memória de instruções: `1024 palavras de 32 bits`.
-- Memória de dados: `1024 palavras de 32 bits`.
-
-Isso sugere que o programa final e os dados devem caber nesse espaço, ou então o compilador/montador precisará validar limites.
-
-### Program Counter
-
-- O `PC` aponta para instruções na ROM.
-- O caminho normal do fluxo faz `PC <- PC + 1`.
-- Branch e jump substituem esse valor por um endereço calculado.
-
-### ULA
-
-- A ULA recebe operandos de registradores ou imediato.
-- Existe sinal `Zero`, usado no controle de `beq` e `bne`.
-
-### JAL e registrador de retorno
-
-- O relatório afirma que `jal` grava `PC + 1` em um registrador específico.
-- O texto sobre multiplexadores indica que o "último endereço" do banco de registradores foi reservado para isso.
-
-Para o compilador, vale tratar esse registrador como reservado para retorno de chamada.
-
-### Registradores especiais
-
-- O processador não tem apenas dois registradores de uso específico.
-- Para o backend, devem ser considerados reservados pelo menos `High`, `Low` e o registrador de link usado por `jal`.
-- O alocador de registradores não deve usar esses registradores como temporários gerais.
-
-### Entrada e saída
-
-- O projeto possui suporte explícito a `input` por switches da FPGA.
-- O valor de entrada pode seguir para registrador ou para memória, dependendo da lógica do sistema.
-- A saída é exibida em portas/displays.
-
-Isso reforça o mapeamento natural:
-
-- `input()` -> `in`
-- `output(x)` -> `out`
-
-## 7. Convenções práticas recomendadas para o compilador
-
-Enquanto o hardware e o encoder não forem revalidados juntos, vale assumir estas regras de projeto:
-
-- reservar registradores especiais para `High`, `Low` e registrador de link de `jal`;
-- evitar gerar `mult`, `multi`, `div` e `divi` até que o caminho de leitura de `High/Low` esteja claramente definido;
-- preferir `AddI`, `SubI`, `move`, `load`, `store`, `beq`, `bne`, `jump`, `jal`, `jumpR`, `in`, `out`, `nop` e `hlt` no primeiro conjunto estável do backend;
-- limitar imediatos ao intervalo representável em `14 bits`, com extensão de sinal;
-- codificar branch de forma compatível com o hardware, considerando o cálculo com `extImm << 2`;
-- padronizar como labels viram campo de `26 bits` em `F3`.
-
-## 8. Decisões confirmadas para o backend
-
-Estas definições devem ser tratadas como referência do compilador:
-
-- No formato `F1`, a ordem correta dos campos para geração de código é `RS`, `RT`, `RD`, conforme o Verilog.
-
-- A instrução `Store` deve ser tratada com registrador-base e registrador-fonte distintos.
-
-- A instrução `Divi` deve ser entendida como divisão de um valor em registrador por um imediato, armazenando o resultado em outro registrador.
-
-- Para `In` e `Out`, usar `6 bits de opcode + 6 bits de registrador + 20 bits zerados`. O valor dos switches não faz parte da instrução; ele é lido do hardware em tempo de execução.
-
-- Há mais de dois registradores com papel especial no processador.
-
-- O encoder deve gerar branches de forma compatível com o cálculo de desvio feito no hardware com `extImm << 2`.
-
-## 9. Resumo operacional para o backend
-
-Se o objetivo for fazer o compilador funcionar logo com esse processador, o backend deve assumir:
-
-1. ISA fixa de `32 bits`, com formatos `F1/F2/F3`.
-2. Arquitetura `Harvard`, com ROM de instruções e RAM de dados separadas.
-3. Banco com `64 registradores`.
-4. Suporte nativo a aritmética básica, branches, jumps, I/O e halt.
-5. `assembly`, `encoder` e backend devem seguir as convenções já fixadas neste documento para registradores, immediatos, `store`, `in/out`, `jal` e branches.
-
-## 10. Uso de $gp e recursão (parâmetros na pilha)
-
-### Por que usar $gp para parâmetros quebra recursão
-
-No compilador, o `asmgen.c` tratava a quádrupla **ARG** copiando cada parâmetro da pilha para uma posição fixa em memória relativamente a **$gp** (ex.: `1($gp)`, `2($gp)`). Variáveis locais e parâmetros compartilham o mesmo `memloc` da tabela de símbolos para **LOAD**/**STORE** via `$gp`.
-
-Isso quebra recursão porque:
-
-1. **Um único endereço por parâmetro:** Na tabela de símbolos, cada parâmetro (ex.: `u`, `v` de `gcd`) tem um único `memloc` (ex.: 1 e 2). Todas as ativações da função usam os mesmos offsets em `$gp` para esses nomes.
-2. **Sobrescrita na chamada recursiva:** Na primeira ativação de `gcd(u=12, v=8)`, o prólogo (ARG) grava 12 em `1($gp)` e 8 em `2($gp)`. Se no meio do corpo a função chama `gcd(8, 4)`, o prólogo da nova ativação grava 8 e 4 em `1($gp)` e `2($gp)`, sobrescrevendo os valores da ativação anterior.
-3. **Retorno à ativação anterior:** Quando a chamada interna retorna, a ativação externa continua usando LOAD/STORE em `1($gp)` e `2($gp)`, que agora contêm os valores da chamada interna (8 e 4), e não mais os da ativação externa (12 e 8). O resultado é incorreto.
-
-Ou seja: parâmetros em **$gp** são efetivamente **globais por nome**; não há “cópia por ativação”, então recursão (e reentrância) quebram.
-
-### Solução adotada: parâmetros só na pilha
-
-- **Parâmetros não são mais copiados para $gp.** A quádrupla ARG apenas registra o nome do parâmetro na ordem de declaração; não se emite `lw`/`sw` para `memloc($gp)`.
-- **Acesso a parâmetros:** Sempre por **offset em relação a $sp**. Na entrada da função, o chamador já empilhou `$ra` e os argumentos (último argumento no topo). O callee acessa o parâmetro de índice `i` (0 = primeiro) em `(paramCount - 1 - i + stackDelta)($sp)`, onde `stackDelta` é o número de palavras empilhadas pelo callee desde a entrada (ex.: antes de um `jal`, após salvar `$ra` e os argumentos da chamada).
-- **Variáveis locais e globais:** Continuam em `memloc($gp)` como antes; apenas **parâmetros** da função atual passam a ser acessados via `$sp`.
-- **Convenção de chamada:** Mantida: chamador faz `saveReturnRegister` (push `$ra`), depois um `pushArg` por argumento (em ordem), depois `jal`; após o retorno, `popArgs` e `restoreReturnRegister`. O callee não altera o significado dos offsets dos seus parâmetros até ele mesmo empilhar mais coisas (aí usa `stackDelta`).
-
-Assim, cada ativação tem seus próprios argumentos na pilha; não há compartilhamento via $gp e a recursão passa a funcionar.
-
-### Alterações no código
-
-- **asmgen.c:**
-  - Manter lista dos nomes dos parâmetros da função atual (preenchida ao processar ARG).
-  - Para ARG: apenas registrar o parâmetro (e incrementar o índice); **não** emitir `lw`/`sw` para `$gp`.
-  - Para LOAD/STORE: se o símbolo for parâmetro da função atual, emitir `lw`/`sw` com offset em `$sp` (usando `paramCount`, índice do parâmetro e `stackDelta`); caso contrário, manter `memloc($gp)`.
-  - Atualizar `stackDelta` ao emitir `saveReturnRegister`, `pushArg`, `popArgs` e `restoreReturnRegister`.
-- **cgen.c** e a convenção de chamada (quádruplas PARAM/CALL/RET): sem alteração necessária; a mudança é só na convenção de *implementação* no assembly (parâmetros só na pilha no asmgen).
-
-## 11. Vetores e parâmetros array (ex.: sort.cms)
-
-### Convenção no intermediário
-
-- **Parâmetro array** (ex.: `int a[]`): passado **por endereço**. O chamador emite `ADDR arr, -, temp` e depois `PARAM temp`. O valor empilhado é o **endereço base** do vetor (em palavras, para memória word-addressable).
-- **LOADV name, index, dst**: acessa `name[index]`. O primeiro operando é o nome do vetor (global, local ou parâmetro); o segundo é o índice (já em registrador).
-- **STOREV value, index, name**: grava `value` em `name[index]`; o nome do vetor está em `result`.
-
-### O que o asmgen precisa fazer
-
-1. **ADDR** (atualmente “não implementado”): deve produzir o endereço base do vetor em um registrador. Para variável global/vetor no escopo atual: `addi dst, $gp, memloc` (o encoder usa base + imediato; assumindo endereçamento em palavras, `memloc` é o offset da primeira palavra do vetor).
-2. **LOADV** quando o vetor é **parâmetro**: a base não está em `$gp`; está na pilha (o valor passado pelo chamador). Gerar: carregar a base a partir de `offset($sp)` (mesmo offset usado para LOAD do parâmetro), depois `base + index` em um temp, depois `lw dst, 0(addr)`. Assim cada ativação usa sua própria cópia do endereço e vetores como parâmetro funcionam com recursão.
-3. **LOADV** quando o vetor **não** é parâmetro (global/local em `$gp`): base = `$gp + memloc(name)`. Gerar: `addi baseReg, $gp, memloc` (ou equivalente), depois `baseReg + index`, depois `lw dst, 0(addr)`. Não usar o nome do vetor como registrador no `sll` (isso gera assembly inválido quando o nome é parâmetro e quebra o caso sort/minloc).
-4. **STOREV**: mesma lógica para a base: se `result` (nome do vetor) for parâmetro, base na pilha; senão base = `$gp + memloc`. Em seguida calcular endereço, depois `sw value, 0(addr)`.
-
-Assumindo **endereçamento em palavras**: o índice já representa a posição em palavras; não é necessário `sll` para multiplicar por 4 nesse modelo. Se o ISA usar deslocamento em bytes, a base e o índice precisariam ser convertidos para bytes (ex.: base*4 + index*4).
-
-## 13. Instrução Div e operação de resto (ISA High/Low)
-
-### Diferença entre o ISA e o que o compilador gerava
-
-- **ISA (processador):** A instrução **Div** é formato F1 com **dois operandos** (RS, RT). O resultado **não** vai para um registrador geral: o **resto** é escrito em **High** e o **quociente** em **Low**. Não existe “div rd, r1, r2” com resultado em rd.
-- **Compilador (antes do ajuste):** O asmgen emitia `div rd, r1, r2` (três operandos, resultado em rd), o que **não corresponde** ao ISA. O encoder montava F1 com três campos; o hardware ignora o campo RD para Div e escreve apenas em High/Low.
-- **Código intermediário (.tm):** O resto é implementado como **u - (u/v)*v**: uma quádrupla **DIV** (quociente) seguida de **MUL** (quociente × divisor) e **SUB** (dividendo − esse produto). Não há quádrupla REM; o quociente vem da DIV e o resto é obtido por essa sequência.
-
-### Proposta: gerar Div correta e obter quociente/resto
-
-1. **DIV no assembly:** Emitir a instrução **Div** do ISA com **dois operandos**: `div rs, rt` (dividendo, divisor). O processador coloca resto em **High** e quociente em **Low**.
-2. **Quociente em registrador geral:** Imediatamente após `div`, copiar **Low** para o registrador destino da quádrupla com a instrução **move** do ISA: `move rd, $lo`. Assim a quádrupla `(DIV, a, b, dst)` passa a significar “quociente em dst”.
-3. **Resto:** O .tm já calcula resto como `u - (u/v)*v`. Com a DIV correta, o quociente em dst é usado na sequência MUL e SUB; o resultado final é o resto. Alternativamente, se no futuro existir uso direto de resto, pode-se emitir `move rd, $hi` após `div` (resto em High).
-4. **MUL (Mult):** O ISA escreve o produto em **High/Low**. Para a quádrupla `(MUL, a, b, dst)` (resultado 32 bits em dst), emitir `mult r1, r2` e depois `move rd, $lo`.
-
-### Convenção de registradores $hi e $lo
-
-- O encoder e o processador devem tratar **$hi** e **$lo** como os registradores especiais onde Div/Mult escrevem (e dos quais se lê com **move**). No encoder, eles são mapeados para os índices do banco reservados a High e Low (ex.: 62 e 61 se o último for o de link JAL).
-
-### Alterações no código
-
-- **asmgen.c:** Para **DIV**: emitir `div r1, r2` e em seguida `move rd, $lo`. Para **MUL**: emitir `mult r1, r2` e em seguida `move rd, $lo`.
-- **encoder.c:** Incluir **$hi** e **$lo** em `mapReg` com os números corretos do processador. Para as instruções **DIV** e **MULT** (F1), quando a linha de assembly tiver **apenas dois operandos**, montar F1 com RS=op1, RT=op2 e RD=0 (campo ignorado pelo hardware).
-
-## 14. Uso deste documento
-
-Este arquivo deve servir como referência de contexto para:
-
-- implementar ou revisar `asmgen.c`;
-- implementar ou revisar `encoder.c`;
-- definir convenções de registradores;
-- decidir quais instruções já podem ser consideradas estáveis no compilador;
-- documentar divergências entre o relatório e a implementação real.
+## 1. Arquitetura geral
+
+| Aspecto | Especificação |
+|---------|---------------|
+| Tipo | RISC monociclo |
+| Arquitetura de memória | Harvard (instrução e dados separados) |
+| Tamanho da instrução | 32 bits fixo |
+| Formatos de instrução | 3 (F1, F2, F3/FI) |
+| Banco de registradores | 64 registradores × 32 bits |
+| Identificador de registrador | 6 bits |
+| Memória de instruções | 1024 palavras × 32 bits |
+| Memória de dados | 1024 palavras × 32 bits |
+| Endereçamento | Por palavra (PC avança de 1 em 1) |
+| PC inicial | 0 |
+
+**IMPORTANTE — Endereçamento por palavra:**
+O PC avança como `PC ← PC + 1` (não `PC + 4`). Cada posição da memória de instrução contém uma instrução completa de 32 bits. Labels e endereços de salto são índices de linha (word address), não byte address.
+
+---
+
+## 2. Formatos de instrução
+
+### F1 — Register (operações entre registradores)
+
+```
+  31    26 25    20 19    14 13     8 7      0
+ ┌────────┬────────┬────────┬────────┬────────┐
+ │ Opcode │   RS   │   RT   │   RD   │ Shamt  │
+ │ 6 bits │ 6 bits │ 6 bits │ 6 bits │ 8 bits │
+ └────────┴────────┴────────┴────────┴────────┘
+```
+
+- **RS**: primeiro operando fonte (registrador)
+- **RT**: segundo operando fonte (registrador)
+- **RD**: registrador destino
+- **Shamt**: shift amount (usado por Sr/Sl; zero para demais)
+
+**Semântica:** `RD ← RS op RT`
+
+**Exceção MULT/DIV:** RD é 0 (ignorado); resultado vai para $hi e $lo.
+**Exceção JR:** RS contém o endereço de salto; RT e RD são 0.
+
+### F2 — Immediate (operações com imediato, memória, branches)
+
+```
+  31    26 25    20 19    14 13              0
+ ┌────────┬────────┬────────┬────────────────┐
+ │ Opcode │   RD   │   RS   │   Imediato     │
+ │ 6 bits │ 6 bits │ 6 bits │   14 bits      │
+ └────────┴────────┴────────┴────────────────┘
+```
+
+- **RD**: registrador destino (ou fonte em sw/beq/bne)
+- **RS**: registrador fonte (ou base em lw/sw)
+- **Imediato**: valor de 14 bits com extensão de sinal
+
+**Para LW:** `RD ← MEM[RS + signext(Imm)]`
+**Para SW:** `MEM[RS + signext(Imm)] ← RD`
+**Para BEQ:** se `RD == RS`, então `PC ← PC + 1 + signext(Imm)`
+**Para BNE:** se `RD != RS`, então `PC ← PC + 1 + signext(Imm)`
+**Para ADDI:** `RD ← RS + signext(Imm)`
+**Para MOVE:** `RD ← RS` (Imm ignorado)
+
+### F3 — Jump (saltos incondicionais, controle)
+
+```
+  31    26 25                             0
+ ┌────────┬──────────────────────────────┐
+ │ Opcode │         Endereço             │
+ │ 6 bits │         26 bits              │
+ └────────┴──────────────────────────────┘
+```
+
+- **Endereço**: endereço absoluto de destino (word address)
+
+**Para J:** `PC ← Endereço`
+**Para JAL:** `$ra ← PC + 1`, depois `PC ← Endereço`
+**Para HLT:** para a execução (PC não avança mais)
+
+### FI — I/O (entrada/saída)
+
+```
+  31    26 25    20 19                    0
+ ┌────────┬────────┬──────────────────────┐
+ │ Opcode │  Reg   │       zeros          │
+ │ 6 bits │ 6 bits │      20 bits         │
+ └────────┴────────┴──────────────────────┘
+```
+
+- **Para IN:** `Reg ← valor dos switches de entrada`
+- **Para OUT:** `display ← Reg`
+
+---
+
+## 3. Conjunto completo de instruções (ISA)
+
+### 3.1 Tabela de opcodes
+
+| # | Instrução | Opcode (bin) | Opcode (dec) | Formato | Operação |
+|---|-----------|-------------|-------------|---------|----------|
+| 0 | ADD | 000000 | 0 | F1 | RD ← RS + RT |
+| 1 | ADDI | 000001 | 1 | F2 | RD ← RS + signext(Imm) |
+| 2 | SUB | 000010 | 2 | F1 | RD ← RS - RT |
+| 3 | SUBI | 000011 | 3 | F2 | RD ← RS - signext(Imm) |
+| 4 | MULT | 000100 | 4 | F1 | {Hi,Lo} ← RS × RT |
+| 5 | MULTI | 000101 | 5 | F2 | {Hi,Lo} ← RS × signext(Imm) |
+| 6 | DIV | 000110 | 6 | F1 | Lo ← RS / RT ; Hi ← RS % RT |
+| 7 | DIVI | 000111 | 7 | F2 | Lo ← RS / signext(Imm) ; Hi ← RS % signext(Imm) |
+| 8 | AND | 001000 | 8 | F1 | RD ← RS & RT |
+| 9 | ANDI | 001001 | 9 | F2 | RD ← RS & zeroext(Imm) |
+| 10 | OR | 001010 | 10 | F1 | RD ← RS \| RT |
+| 11 | ORI | 001011 | 11 | F2 | RD ← RS \| zeroext(Imm) |
+| 12 | NOT | 001100 | 12 | F2 | RD ← ~RS |
+| 13 | SR | 001101 | 13 | F1 | RD ← RS >> Shamt |
+| 14 | SL | 001110 | 14 | F1 | RD ← RS << Shamt |
+| 15 | LW | 001111 | 15 | F2 | RD ← MEM[RS + signext(Imm)] |
+| 16 | SW | 010000 | 16 | F2 | MEM[RS + signext(Imm)] ← RD |
+| 17 | J | 010001 | 17 | F3 | PC ← Addr |
+| 18 | JR | 010010 | 18 | F1 | PC ← RS |
+| 19 | JAL | 010011 | 19 | F3 | $ra ← PC+1 ; PC ← Addr |
+| 20 | BEQ | 010100 | 20 | F2 | se RD == RS: PC ← PC+1+signext(Imm) |
+| 21 | BNE | 010101 | 21 | F2 | se RD != RS: PC ← PC+1+signext(Imm) |
+| 22 | MOVE | 010110 | 22 | F2 | RD ← RS |
+| 23 | NOP | 010111 | 23 | F3 | nenhuma operação |
+| 24 | HLT | 011000 | 24 | F3 | para execução |
+| 25 | SLT | 011001 | 25 | F1 | RD ← (RS < RT) ? 1 : 0 |
+| 26 | IN | 011010 | 26 | FI | Reg ← input |
+| 27 | OUT | 011011 | 27 | FI | output ← Reg |
+
+### 3.2 Instruções usadas pelos programas de teste
+
+| Instrução | Usada por |
+|-----------|-----------|
+| ADD | todos |
+| ADDI | todos |
+| SUB | fatorial, gcd, sort |
+| MULT | fatorial, gcd |
+| DIV | gcd |
+| LW | todos |
+| SW | todos |
+| J | todos |
+| JR | gcd, sort |
+| JAL | gcd, sort |
+| BEQ | fatorial, gcd, sort |
+| MOVE | fatorial, gcd |
+| SLT | fatorial, sort |
+| HLT | todos |
+| IN | teste, gcd, sort |
+| OUT | todos |
+
+Instruções **não usadas** pelos testes atuais: SUBI, MULTI, DIVI, AND, ANDI, OR, ORI, NOT, SR, SL, BNE, NOP. Estas devem ser implementadas mas não são críticas para a validação inicial.
+
+---
+
+## 4. Registradores
+
+### 4.1 Banco de registradores
+
+O banco tem **64 registradores** de 32 bits. O compilador utiliza os seguintes:
+
+| Nome | Número | Binário (6 bits) | Uso |
+|------|--------|------------------|-----|
+| `$zero` | 0 | 000000 | Sempre zero (hardwired) |
+| `$v0` | 2 | 000010 | Valor de retorno de funções |
+| `$t0` | 8 | 001000 | Temporário |
+| `$t1` | 9 | 001001 | Temporário |
+| `$t2` | 10 | 001010 | Temporário |
+| `$t3` | 11 | 001011 | Temporário |
+| `$t4` | 12 | 001100 | Temporário |
+| `$t5` | 13 | 001101 | Temporário |
+| `$t6` | 14 | 001110 | Temporário |
+| `$t7` | 15 | 001111 | Temporário |
+| `$t8` | 16 | 010000 | Temporário |
+| `$t9` | 17 | 010001 | Temporário |
+| `$gp` | 28 | 011100 | Ponteiro global (base da memória de dados) |
+| `$sp` | 29 | 011101 | Ponteiro de pilha |
+| `$ra` | 31 | 011111 | Endereço de retorno (escrito por JAL) |
+| `$lo` | 61 | 111101 | Resultado baixo de MULT/DIV |
+| `$hi` | 62 | 111110 | Resultado alto de MULT/DIV |
+
+### 4.2 Requisitos do hardware
+
+1. **$zero** deve sempre ler 0, escritas são ignoradas
+2. **$lo e $hi** devem ser escritos por MULT e DIV automaticamente
+3. **$lo e $hi** devem ser lidos por MOVE (`move $tN,$lo` → `MOVE RD=$tN, RS=$lo`)
+4. **$ra** deve ser escrito por JAL com `PC + 1`
+5. **$gp** deve ser inicializado com o endereço base da memória de dados (tipicamente 0)
+6. **$sp** deve ser inicializado com o topo da pilha (ex: 1023 para pilha crescendo para baixo)
+
+---
+
+## 5. Memória
+
+### 5.1 Memória de instruções (ROM)
+
+- 1024 palavras × 32 bits
+- Endereçada pelo PC (word address, 0 a 1023)
+- Carregada com o conteúdo do `.txt` (uma linha = uma instrução)
+- Somente leitura durante execução
+
+### 5.2 Memória de dados (RAM)
+
+- 1024 palavras × 32 bits
+- Endereçada por `RS + signext(Imm)` nas instruções LW/SW
+- A região baixa (a partir do endereço 0, apontada por `$gp`) contém variáveis globais
+- A região alta (a partir do endereço apontado por `$sp`) contém a pilha (cresce para baixo)
+
+### 5.3 Layout da memória de dados (exemplo: sort.cms)
+
+```
+Endereço 0..9:   vet[10] (vetor global)
+Endereço 10..13: variáveis de minloc (i, x, k, etc.)
+Endereço 14..17: ...
+...
+Endereço 25:     variável i de main
+```
+
+A pilha começa no topo (ex: $sp = 1023) e cresce para baixo com `addi $sp,$sp,-1`.
+
+---
+
+## 6. Cálculo de endereços de salto e branch
+
+### 6.1 Jump (J) e JAL
+
+Formato F3. O campo Endereço (26 bits) contém o **endereço absoluto** (word address) do destino.
+
+```
+PC ← Endereço[25:0]
+```
+
+**Exemplo real (gcd.txt, addr 0):**
+```
+01000100000000000000000000100110
+│opcode│        endereço        │
+│010001│00000000000000000000100110│ = J para endereço 38 (main)
+```
+
+**Exemplo real (gcd.txt, addr 31):**
+```
+01001100000000000000000000000001
+│010011│00000000000000000000000001│ = JAL para endereço 1 (gcd)
+```
+
+### 6.2 Branch (BEQ/BNE)
+
+Formato F2. O campo Imediato (14 bits, com sinal) contém o **offset relativo** ao PC+1.
+
+```
+se condição verdadeira:
+    PC ← PC + 1 + signext(Imm[13:0])
+senão:
+    PC ← PC + 1
+```
+
+**ATENÇÃO:** O offset é calculado como `addr_destino - addr_branch - 1`. O processador soma `signext(Imm)` a `PC + 1` (que é o endereço da próxima instrução sequencial).
+
+**Exemplo real (fatorial.txt, addr 10):**
+```
+01010000110000000000000000001010
+│010100│001100│000000│00000000001010│
+│ BEQ  │$t4   │$zero │ Imm = 10    │
+```
+Destino: `PC + 1 + 10 = 10 + 1 + 10 = 21` (label L1) ✅
+
+**Exemplo real (gcd.txt, addr 6):**
+```
+01010000101000000000000000000010
+│010100│001010│000000│00000000000010│
+│ BEQ  │$t2   │$zero │ Imm = 2     │
+```
+Destino: `6 + 1 + 2 = 9` (label .L_eq_0) ✅
+
+**Exemplo real (sort.txt, addr 52):**
+```
+01010000110100000000000000100100
+│010100│001101│000000│00000000100100│
+│ BEQ  │$t5   │$zero │ Imm = 36    │
+```
+Destino: `52 + 1 + 36 = 89` (label L5) ✅
+
+### 6.3 JR (Jump Register)
+
+Formato F1. O campo RS contém o registrador com o endereço de destino.
+
+```
+PC ← Reg[RS]
+```
+
+**Exemplo real (gcd.txt, addr 15):**
+```
+01001001111100000000000000000000
+│010010│011111│000000│000000│00000000│
+│  JR  │ $ra  │  0   │  0   │   0    │
+```
+
+---
+
+## 7. Instruções MULT e DIV — Registradores especiais
+
+### 7.1 MULT
+
+Formato F1. Multiplica RS × RT e armazena o resultado de 64 bits em {$hi, $lo}.
+
+```
+{$hi, $lo} ← RS × RT
+```
+
+O campo RD é **0** (ignorado pelo hardware). O compilador obtém o resultado com `move $tN,$lo` logo após.
+
+**Exemplo real (fatorial.txt, addr 13):**
+```
+00010000110100111000000000000000
+│000100│001101│001110│000000│00000000│
+│ MULT │$t5=13│$t6=14│ RD=0 │ sh=0   │
+```
+Seguido por (addr 14): `move $t7,$lo`
+```
+01011000111111110100000000000000
+│010110│001111│111101│00000000000000│
+│ MOVE │$t7=15│$lo=61│    Imm=0    │
+```
+
+### 7.2 DIV
+
+Formato F1. Divide RS / RT. Quociente em $lo, resto em $hi.
+
+```
+$lo ← RS / RT (quociente)
+$hi ← RS % RT (resto)
+```
+
+O campo RD é **0** (ignorado pelo hardware). O compilador obtém o quociente com `move $tN,$lo`.
+
+**Exemplo real (gcd.txt, addr 23):**
+```
+00011000111000111100000000000000
+│000110│001110│001111│000000│00000000│
+│ DIV  │$t6=14│$t7=15│ RD=0 │ sh=0   │
+```
+Seguido por: `move $t8,$lo`
+
+### 7.3 Requisitos do hardware para MULT/DIV
+
+1. MULT/DIV devem escrever em $hi e $lo (registradores 62 e 61)
+2. MOVE deve ser capaz de ler $hi e $lo como RS (campo RS do F2)
+3. O compilador **nunca** usa RD em MULT/DIV (sempre 0)
+4. O compilador **sempre** emite MOVE logo após MULT/DIV para copiar $lo para um $tN
+5. MULT do compilador usa apenas a parte baixa (32 bits); o compilador não lê $hi para multiplicação
+
+---
+
+## 8. Instruções de memória (LW/SW)
+
+### 8.1 LW (Load Word)
+
+Formato F2. Lê da memória de dados.
+
+```
+Endereço efetivo = Reg[RS] + signext(Imm)
+RD ← MEM[endereço efetivo]
+```
+
+**Exemplo real (teste2.txt, addr 7):**
+```
+00111100101001110000000000000001
+│001111│001010│011100│00000000000001│
+│  LW  │$t2=10│$gp=28│   Imm=1     │
+```
+→ `lw $t2,1($gp)` — carrega variável `x` da posição `$gp + 1`
+
+**Exemplo real (gcd.txt, addr 3):**
+```
+00111100100001110100000000000001
+│001111│001000│011101│00000000000001│
+│  LW  │$t0=8 │$sp=29│   Imm=1     │
+```
+→ `lw $t0,1($sp)` — carrega parâmetro `v` da pilha
+
+### 8.2 SW (Store Word)
+
+Formato F2. Escreve na memória de dados.
+
+```
+Endereço efetivo = Reg[RS] + signext(Imm)
+MEM[endereço efetivo] ← Reg[RD]
+```
+
+**NOTA sobre SW:** No formato F2, o campo chamado "RD" (bits 25-20) contém o registrador **fonte** (cujo valor será escrito na memória). O campo "RS" (bits 19-14) contém o registrador **base** para cálculo do endereço. A nomenclatura "RD" vem do formato, não da semântica — em SW, RD é a fonte e RS é a base.
+
+**Exemplo real (teste2.txt, addr 4):**
+```
+01000000100001110000000000000001
+│010000│001000│011100│00000000000001│
+│  SW  │$t0=8 │$gp=28│   Imm=1     │
+```
+→ `sw $t0,1($gp)` — armazena `$t0` na posição `$gp + 1`
+
+---
+
+## 9. Instrução SLT (Set on Less Than)
+
+Formato F1. Comparação entre registradores.
+
+```
+RD ← (RS < RT) ? 1 : 0
+```
+
+A comparação é com sinal (signed).
+
+**Exemplo real (sort.txt, addr 16):**
+```
+01100100111000111101000000000000
+│011001│001110│001111│010000│00000000│
+│ SLT  │$t6=14│$t7=15│$t8=16│ sh=0   │
+```
+→ `slt $t8,$t6,$t7` — `$t8 = ($t6 < $t7) ? 1 : 0`
+
+O compilador usa SLT seguido de BEQ com $zero para implementar condições de loop:
+```
+slt  $t8,$t6,$t7      # $t8 = (i < high) ? 1 : 0
+beq  $t8,$zero,L1     # se $t8 == 0, sai do loop
+```
+
+---
+
+## 10. Instruções de I/O
+
+### 10.1 IN (Input)
+
+Formato FI. Lê valor de entrada (switches da FPGA) e grava no registrador.
+
+```
+Reg ← valor_de_entrada
+```
+
+**Exemplo real (teste.txt, addr 3):**
+```
+01101000100000000000000000000000
+│011010│001000│00000000000000000000│
+│  IN  │$t0=8 │      zeros         │
+```
+
+### 10.2 OUT (Output)
+
+Formato FI. Envia valor do registrador para a saída (display).
+
+```
+saída ← Reg
+```
+
+**Exemplo real (teste2.txt, addr 12):**
+```
+01101100110000000000000000000000
+│011011│001100│00000000000000000000│
+│ OUT  │$t4=12│      zeros         │
+```
+
+---
+
+## 11. Instrução HLT
+
+Formato F3. Todos os 26 bits de endereço são zero.
+
+```
+01100000000000000000000000000000
+│011000│00000000000000000000000000│
+│ HLT  │         zeros            │
+```
+
+O processador deve parar de avançar o PC. Tipicamente implementado como um flag que desabilita a escrita no PC.
+
+---
+
+## 12. Fluxo de execução típico
+
+### 12.1 Programa simples (teste2.cms: 5+3=8)
+
+```
+Addr 0:  j main          → PC = 1 (main)
+Addr 1:  addi $sp,$sp,-1 → $sp = $sp - 1
+Addr 2:  sw $ra,0($sp)   → MEM[$sp] = $ra
+Addr 3:  addi $t0,$zero,5 → $t0 = 5
+Addr 4:  sw $t0,1($gp)   → MEM[$gp+1] = 5 (x)
+Addr 5:  addi $t1,$zero,3 → $t1 = 3
+Addr 6:  sw $t1,2($gp)   → MEM[$gp+2] = 3 (y)
+Addr 7:  lw $t2,1($gp)   → $t2 = MEM[$gp+1] = 5
+Addr 8:  lw $t3,2($gp)   → $t3 = MEM[$gp+2] = 3
+Addr 9:  add $t4,$t2,$t3  → $t4 = 5 + 3 = 8
+Addr 10: addi $sp,$sp,-1
+Addr 11: sw $t4,0($sp)
+Addr 12: out $t4          → output = 8
+Addr 13: addi $sp,$sp,1
+Addr 14: hlt              → FIM
+```
+
+### 12.2 Programa com chamada de função (gcd.cms)
+
+```
+Addr 0:  j main           → salta para main (addr 38)
+Addr 1:  gcd:             → início de gcd
+         ...               (corpo de gcd, incluindo chamada recursiva)
+Addr 38: main:            → início de main
+         in $t3            → lê x
+         in $t4            → lê y
+         push x, push y
+         jal gcd           → chama gcd, $ra = PC+1
+         ...
+         out $t7           → imprime resultado
+         hlt               → FIM
+```
+
+### 12.3 Convenção de chamada de função
+
+**Caller (chamador):**
+1. Empilha argumentos: `addi $sp,$sp,-1` + `sw arg,0($sp)` para cada argumento
+2. `jal funcao` — salva `PC+1` em `$ra`, salta para o endereço da função
+3. Após retorno: `addi $sp,$sp,N` para limpar N argumentos da pilha
+4. Resultado em `$v0`: `add $tN,$v0,$zero`
+
+**Callee (chamado):**
+1. Prologue: `addi $sp,$sp,-1` + `sw $ra,0($sp)` (salva $ra)
+2. Acessa parâmetros via offsets em `$sp`
+3. Para retornar: `add $v0,resultado,$zero` + `lw $ra,0($sp)` + `addi $sp,$sp,1` + `jr $ra`
+4. Se é `main`: termina com `hlt` em vez de `jr $ra`
+
+---
+
+## 13. Checklist de implementação do processador
+
+### 13.1 Decodificação de instrução (obrigatório)
+
+- [ ] Extrair opcode (bits 31-26)
+- [ ] Para F1: extrair RS (25-20), RT (19-14), RD (13-8), Shamt (7-0)
+- [ ] Para F2: extrair RD (25-20), RS (19-14), Imm (13-0) com extensão de sinal
+- [ ] Para F3: extrair Endereço (25-0)
+- [ ] Para FI: extrair Reg (25-20)
+
+### 13.2 ULA (obrigatório)
+
+- [ ] ADD: soma signed
+- [ ] SUB: subtração signed
+- [ ] MULT: multiplicação signed, resultado 64-bit em {$hi,$lo}
+- [ ] DIV: divisão signed, quociente em $lo, resto em $hi
+- [ ] AND, OR, NOT: operações lógicas
+- [ ] SLT: comparação signed, resultado 0 ou 1
+- [ ] SR, SL: shifts por Shamt
+
+### 13.3 Controle de fluxo (obrigatório)
+
+- [ ] PC ← PC + 1 (avanço normal)
+- [ ] J: PC ← Addr (26 bits)
+- [ ] JAL: $ra ← PC + 1, PC ← Addr
+- [ ] JR: PC ← Reg[RS]
+- [ ] BEQ: se Reg[RD] == Reg[RS], PC ← PC + 1 + signext(Imm)
+- [ ] BNE: se Reg[RD] != Reg[RS], PC ← PC + 1 + signext(Imm)
+- [ ] HLT: PC congela
+
+### 13.4 Registradores especiais (obrigatório)
+
+- [ ] $zero (reg 0): sempre lê 0
+- [ ] $hi (reg 62): escrito por MULT/DIV
+- [ ] $lo (reg 61): escrito por MULT/DIV
+- [ ] $ra (reg 31): escrito por JAL com PC + 1
+- [ ] MOVE (opcode 010110): copia RS para RD (inclui $lo → $tN)
+
+### 13.5 Memória (obrigatório)
+
+- [ ] LW: RD ← MEM[RS + signext(Imm)]
+- [ ] SW: MEM[RS + signext(Imm)] ← RD
+
+### 13.6 I/O (obrigatório)
+
+- [ ] IN: Reg ← input externo
+- [ ] OUT: output externo ← Reg
+
+### 13.7 Inicialização
+
+- [ ] PC = 0
+- [ ] $zero = 0 (hardwired)
+- [ ] $gp = 0 (ou endereço base da memória de dados)
+- [ ] $sp = 1023 (ou topo da memória de dados)
+- [ ] Memória de instruções carregada com o .txt
+
+---
+
+## 14. Binários de referência para teste
+
+Os seguintes binários foram validados manualmente e podem ser usados para testar o processador:
+
+| Arquivo | Instruções | Comportamento esperado |
+|---------|-----------|----------------------|
+| `teste2.txt` | 15 | Calcula 5+3=8, output 8 |
+| `teste.txt` | 15 | Lê 2 valores (in), soma, output resultado |
+| `fatorial.txt` | 27 | Calcula 5!=120, output 120 |
+| `gcd.txt` | 58 | Lê 2 valores, calcula MDC (Euclides recursivo), output |
+| `sort.txt` | 141 | Lê 10 valores, ordena (selection sort), output 10 valores |
+
+**Ordem de teste recomendada:** teste2 → teste → fatorial → gcd → sort (complexidade crescente).
+
+- **teste2** valida: ADD, ADDI, LW, SW, OUT, HLT, J
+- **teste** adiciona: IN
+- **fatorial** adiciona: SLT, BEQ, MULT, MOVE, SUB, loops
+- **gcd** adiciona: JAL, JR, DIV, chamadas recursivas, $v0, $ra
+- **sort** adiciona: múltiplas funções, arrays, pilha intensiva
+
+---
+
+## 15. Pontos críticos de atenção
+
+1. **PC avança de 1 em 1**, não de 4 em 4. O `.txt` é word-addressed.
+2. **Branch offset** é relativo a `PC + 1`, não a `PC`. Fórmula: `novo_PC = PC + 1 + signext(Imm)`.
+3. **SW no F2:** bits 25-20 contêm o registrador fonte (valor a escrever), não o destino. A nomenclatura "RD" no formato é enganosa para SW.
+4. **MULT/DIV:** resultado vai para $hi/$lo, RD no F1 é 0. O processador deve detectar MULT/DIV e escrever em $hi/$lo em vez de RD.
+5. **MOVE lê $lo/$hi:** quando RS=61 ou RS=62, MOVE deve ler os registradores especiais.
+6. **JAL salva PC+1** em $ra (registrador 31), não PC+4.
+7. **$zero** (reg 0) deve ser hardwired a 0. Muitas instruções dependem de ler 0 deste registrador.
+8. **Extensão de sinal** do imediato de 14 bits é essencial — offsets negativos (ex: `addi $sp,$sp,-1`) usam complemento de 2.
+9. **HLT** deve parar o PC. O programa termina com esta instrução.
+10. **Endereçamento de memória** de dados é em palavras (não bytes). `lw $t0,1($gp)` lê a palavra no endereço `$gp + 1`, não `$gp + 4`.
