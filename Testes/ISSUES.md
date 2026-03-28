@@ -478,7 +478,7 @@ No mesmo ajuste, `jr`/`jumpR` foi alinhada ao formato `F1` como instrução uná
 
 ---
 
-## Issue #11 — [ENCODER] Ordem dos campos F1 difere do ISA
+## Issue #11 — [ENCODER] Ordem dos campos F1 difere do ISA~~ CORRIGIDA
 
 **Afeta:** teste2.cms, teste.cms, fatorial.cms, gcd.cms, sort.cms
 **Etapa:** 4
@@ -493,9 +493,23 @@ Além do tamanho dos campos (Issue #10), a ordem dos campos de registradores em 
 **Ajuste necessário:**
 Corrigir simultaneamente com a Issue #10. Ao alterar para 6 bits, também reorganizar a ordem: `[opcode:6][RS:6][RT:6][RD:6][Shamt:8]`.
 
+**Correção aplicada:**
+Em `encoder.c`, a montagem de instruções `F1` já foi ajustada para seguir a ordem definida pela ISA:
+- `[opcode:6][RS:6][RT:6][RD:6][Shamt:8]`
+
+**Validação:**
+Após recompilar o projeto e regenerar `gcd.txt` e `sort.txt`, o encoding foi conferido novamente e as instruções `F1` passaram a sair com os campos na ordem correta.
+
+Exemplos validados:
+- `sub $t2,$t0,$t1` → `RS=$t0`, `RT=$t1`, `RD=$t2`
+- `slt $t8,$t6,$t7` → `RS=$t6`, `RT=$t7`, `RD=$t8`
+- `jr $ra` → `RS=$ra`, `RT=0`, `RD=0`
+
 ---
 
-## Issue #12 — [ENCODER] `$v0` não está no mapeamento de registradores
+## Issue #12 — ~~[ENCODER] `$v0` não está no mapeamento de registradores~~ CORRIGIDA
+
+**Status:** CORRIGIDA em 28/03/2026
 
 **Afeta:** gcd.cms, sort.cms
 **Etapa:** 4
@@ -519,6 +533,13 @@ Esperado: RD = número de $v0 (ex: 2 no MIPS padrão)
 
 **Ajuste necessário:**
 Em `encoder.c`, adicionar `$v0` ao mapeamento de registradores com o número correto (verificar a especificação do processador Verilog para determinar qual registrador corresponde a `$v0`).
+
+**Validação:**
+Após recompilar o compilador e regenerar `gcd.txt` e `sort.txt`, as instruções que usam `$v0` passaram a codificar o registrador com valor `2`, e não mais `0` (`$zero`).
+
+Exemplos validados:
+- `gcd.s`: `add $v0,$t3,$zero` → `gcd.txt`: `00000000101100000000001000000000`
+- `sort.s`: `add $v0,$t9,$zero` → `sort.txt`: `00000001000100000000001000000000`
 
 ---
 

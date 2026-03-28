@@ -12,6 +12,7 @@
 static int mapReg(const char *r){
     if(!r||!*r) return 0;
     if(!strcasecmp(r,"$zero")) return 0;
+    if(!strcasecmp(r,"$v0"))   return 2;
     if(!strcasecmp(r,"$sp"))   return 29;
     if(!strcasecmp(r,"$gp"))   return 28;
     if(!strcasecmp(r,"$ra"))   return 31;
