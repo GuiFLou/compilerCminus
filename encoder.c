@@ -82,6 +82,12 @@ static int findLabel(const char *n){
     return -1;
 }
 
+static int isLabelRef(const char *s){
+    if(!s || !*s) return 0;
+    if(*s=='.' || *s=='_') return 1;
+    return isalpha((unsigned char)*s);
+}
+
 /* ——— monta uma palavra 32 bits no layout da ISA ——— */
 static uint32_t makeF1(uint8_t op,int rs,int rt,int rd,int shamt){
     return ((uint32_t)op<<26)|
@@ -109,11 +115,12 @@ int encodeAsm(const char *srcTM,const char *dstTXT){
     /* 1ª passagem — rótulos */
     lblCnt=0; int pc=0; char line[128];
     while(fgets(line,sizeof line,fin)){
-        char *p=line; while(isspace(*p)) ++p;
+        char *p=line; while(isspace((unsigned char)*p)) ++p;
         if(*p=='#'||*p=='/'&&p[1]=='/') continue; /* comentário */
-        if(*p=='.'||*p=='\0' || *p=='\n') continue; /* diretiva/vazia */
         char *col=strchr(p,':');
-        if(col){ *col='\0'; addLabel(p,pc); p=col+1; while(isspace(*p)) ++p; }
+        if(col){ *col='\0'; addLabel(p,pc); p=col+1; while(isspace((unsigned char)*p)) ++p; }
+        else if(*p=='.') continue; /* diretiva */
+        if(*p=='\0' || *p=='\n') continue; /* vazia */
         if(*p=='\0'||*p=='\n') continue; /* linha só com label */
         pc++; /* conta instrução */
     }
@@ -121,13 +128,13 @@ int encodeAsm(const char *srcTM,const char *dstTXT){
     FILE *fout=fopen(dstTXT,"w"); if(!fout){fclose(fin);return -2;}
 
     while(fgets(line,sizeof line,fin)){
-        char *p=line; while(isspace(*p)) ++p;
+        char *p=line; while(isspace((unsigned char)*p)) ++p;
         if(*p=='#'||*p=='/'&&p[1]=='/') continue;
-        if(*p=='.'||*p=='\0'||*p=='\n') continue;
         /* corta comentário inline */
         char *cmt=strstr(p,"//"); if(cmt) *cmt='\0'; cmt=strchr(p,'#'); if(cmt) *cmt='\0';
         /* label inline */
-        char *col=strchr(p,':'); if(col){ p=col+1; while(isspace(*p)) ++p; }
+        char *col=strchr(p,':'); if(col){ p=col+1; while(isspace((unsigned char)*p)) ++p; }
+        else if(*p=='.') continue; /* diretiva */
         if(*p=='\0'||*p=='\n') continue;
 
         char *tok=strtok(p," ,\t\r\n"); if(!tok) continue;
@@ -168,12 +175,12 @@ int encodeAsm(const char *srcTM,const char *dstTXT){
                     word = makeF1(m->op, rsF1, rtF1, rdF1, 0);
                 break; }
             case F2:{
-                int imm=0; if(op3){ if(isalpha(*op3)) imm=findLabel(op3)-pc-1; else imm=atoi(op3);} /* label relativo */
+                int imm=0; if(op3){ if(isLabelRef(op3)) imm=findLabel(op3)-pc-1; else imm=atoi(op3);} /* label relativo */
                 if (imm < -8192 || imm > 8191)
                     fprintf(stderr,"[encoder] imediato F2 fora de 14 bits: %d (linha %d)\n",imm,pc+1);
                 word=makeF2(m->op, mapReg(op1), mapReg(op2), imm); break; }
             case F3:{
-                int addr=0; if(op1){ addr=isalpha(*op1)?findLabel(op1):atoi(op1);} word=makeF3(m->op,addr); break; }
+                int addr=0; if(op1){ addr=isLabelRef(op1)?findLabel(op1):atoi(op1);} word=makeF3(m->op,addr); break; }
             case FI:{
                 word=makeIO(m->op, mapReg(op1)); break; }
         }

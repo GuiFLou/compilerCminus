@@ -1,6 +1,6 @@
 # Plano de Testes — Compilador C‑ → MIPS‑Lite
 
-Este documento é um roteiro completo para um **agente de teste** executar, validar e documentar cada estágio do compilador para todos os programas de exemplo. O objetivo final é produzir um relatório `ISSUES.md` com os ajustes necessários no compilador.
+Este documento é um roteiro completo para um **agente de teste** executar, validar e documentar cada estágio do compilador para todos os programas de exemplo. O objetivo final é produzir um relatório `ISSUES.md` com os ajustes necessários no compilador focados em apenas >BUGs<.
 
 ---
 

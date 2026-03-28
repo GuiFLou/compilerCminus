@@ -21,6 +21,8 @@ static int asmLabNum = 0;
 static int currentArgIndex = 0;  /* índice do parâmetro atual dentro da função */
 static int currentFunctionArgCount = 0;
 static const char *currentFunction = "global";
+static int currentFunctionEndReachable = 1;
+static int mainExitEmitted = 0;
 /* Parâmetros só na pilha (não em $gp): nomes na ordem de ARG para a função atual */
 static const char *paramNames[MAX_PARAMS];
 static int paramCount = 0;
@@ -132,6 +134,139 @@ static void popArgs(FILE *o)
     }
 }
 
+static void emitFunctionExit(FILE *o, const char *retReg)
+{
+    if (retReg && retReg[0] != '\0' && strcmp(retReg, "-"))
+        fprintf(o, "    add  $v0,%s,$zero\n", retReg);
+
+    if (!strcmp(currentFunction, "main")) {
+        fprintf(o, "    hlt\n");
+        return;
+    }
+
+    fprintf(o, "    lw   $ra,0($sp)\n");
+    fprintf(o, "    addi $sp,$sp,1\n");
+    fprintf(o, "    jr   $ra\n");
+}
+
+static int findLabelInFunction(Quadruple **body, int bodyCount, const char *label)
+{
+    int i;
+
+    if (!label || !*label) return -1;
+
+    for (i = 0; i < bodyCount; i++) {
+        if (!strcmp(body[i]->op, "LAB") && !strcmp(body[i]->arg1, label))
+            return i;
+    }
+
+    return -1;
+}
+
+static int getFlowSuccessors(Quadruple **body, int bodyCount, int idx, int succ[2])
+{
+    Quadruple *qq = body[idx];
+    int n = 0;
+
+    succ[0] = -1;
+    succ[1] = -1;
+
+    if (!strcmp(qq->op, "RET") || !strcmp(qq->op, "END") || !strcmp(qq->op, "HALT"))
+        return 0;
+
+    if (!strcmp(qq->op, "GOTO")) {
+        int target = findLabelInFunction(body, bodyCount, qq->arg1);
+        if (target >= 0) succ[n++] = target;
+        return n;
+    }
+
+    if (!strcmp(qq->op, "IFF") || !strcmp(qq->op, "BNE")) {
+        int target;
+
+        if (idx + 1 < bodyCount)
+            succ[n++] = idx + 1;
+
+        target = findLabelInFunction(body, bodyCount, qq->arg2);
+        if (target >= 0 && (n == 0 || succ[0] != target))
+            succ[n++] = target;
+
+        return n;
+    }
+
+    if (idx + 1 < bodyCount)
+        succ[n++] = idx + 1;
+
+    return n;
+}
+
+static int functionEndIsReachable(Quadruple *funQuad)
+{
+    Quadruple *qq;
+    Quadruple **body;
+    int *visited;
+    int *stack;
+    int bodyCount = 0;
+    int endIdx = -1;
+    int top = 0;
+    int i;
+
+    if (!funQuad || !funQuad->next) return 0;
+
+    for (qq = funQuad->next; qq; qq = qq->next) {
+        bodyCount++;
+        if (!strcmp(qq->op, "END"))
+            break;
+    }
+
+    if (bodyCount == 0 || !qq || strcmp(qq->op, "END"))
+        return 0;
+
+    body = (Quadruple **)malloc((size_t)bodyCount * sizeof(*body));
+    visited = (int *)calloc((size_t)bodyCount, sizeof(*visited));
+    stack = (int *)malloc((size_t)bodyCount * sizeof(*stack));
+    if (!body || !visited || !stack) {
+        perror("functionEndIsReachable");
+        free(body);
+        free(visited);
+        free(stack);
+        exit(EXIT_FAILURE);
+    }
+
+    qq = funQuad->next;
+    for (i = 0; i < bodyCount; i++, qq = qq->next) {
+        body[i] = qq;
+        if (!strcmp(qq->op, "END"))
+            endIdx = i;
+    }
+
+    stack[top++] = 0;
+    while (top > 0) {
+        int idx = stack[--top];
+        int succ[2];
+        int nSucc;
+        int j;
+
+        if (idx < 0 || idx >= bodyCount || visited[idx])
+            continue;
+
+        visited[idx] = 1;
+        if (idx == endIdx)
+            break;
+
+        nSucc = getFlowSuccessors(body, bodyCount, idx, succ);
+        for (j = 0; j < nSucc; j++) {
+            if (succ[j] >= 0 && succ[j] < bodyCount && !visited[succ[j]])
+                stack[top++] = succ[j];
+        }
+    }
+
+    i = (endIdx >= 0) ? visited[endIdx] : 0;
+    free(body);
+    free(visited);
+    free(stack);
+    return i;
+}
+
 /* ============================================================ */
 void asmGen(Quadruple *q, const char *asmFile)
 {
@@ -160,6 +295,7 @@ void asmGen(Quadruple *q, const char *asmFile)
             currentFunctionArgCount = countFunctionArgs(q->next);
             paramCount = currentFunctionArgCount;
             currentFunction = q->arg2;
+            currentFunctionEndReachable = functionEndIsReachable(q);
             argBytes = 0;
             stackDelta = 0;
             memset((void *)paramNames, 0, sizeof(paramNames));
@@ -338,8 +474,23 @@ void asmGen(Quadruple *q, const char *asmFile)
         else if (!strcmp(op, "PARAM")) {
             pushArg(o, r1);
         }
-        else if(!strcmp(op,"ARGS") || !strcmp(op,"END"))
+        else if(!strcmp(op,"ARGS"))
             fprintf(o,"    # %s\n", op);
+        else if(!strcmp(op,"END")) {
+            fprintf(o,"    # END %s\n", currentFunction);
+            if (currentFunctionEndReachable) {
+                emitFunctionExit(o, NULL);
+                if (!strcmp(currentFunction, "main"))
+                    mainExitEmitted = 1;
+            }
+            currentFunction = "global";
+            currentFunctionEndReachable = 1;
+            currentArgIndex = 0;
+            currentFunctionArgCount = 0;
+            paramCount = 0;
+            argBytes = 0;
+            stackDelta = 0;
+        }
         else if(!strcmp(op,"ALLOC")) {
             q = q->next;
             continue;
@@ -356,16 +507,16 @@ void asmGen(Quadruple *q, const char *asmFile)
         else if (!strcmp(op, "CALL_O")) fprintf(o, "    out  %s\n", r1);
 
         else if (!strcmp(op, "RET")) {
-            if (strcmp(q->arg1, "-"))
-                fprintf(o, "    add  $v0,%s,$zero\n", r1);
-            /* Epílogo: restaura $ra e ajusta $sp antes de retornar */
-            fprintf(o, "    lw   $ra,0($sp)\n");
-            fprintf(o, "    addi $sp,$sp,1\n");
-            fprintf(o, "    jr   $ra\n");
+            emitFunctionExit(o, strcmp(q->arg1, "-") ? r1 : NULL);
+            if (!strcmp(currentFunction, "main"))
+                mainExitEmitted = 1;
         }
 
         /* ---------- Fim de programa ---------- */
-        else if (!strcmp(op, "HALT"))  fprintf(o, "    hlt\n");
+        else if (!strcmp(op, "HALT")) {
+            if (!mainExitEmitted)
+                fprintf(o, "    hlt\n");
+        }
 
         /* ---------- NOP explícito ---------- */
         else if (!strcmp(op, "NOP"))   fprintf(o, "    nop\n");
