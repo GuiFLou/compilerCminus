@@ -418,8 +418,9 @@ Em `encoder.c`, na montagem de instruções `in` e `out`, extrair o registrador 
 
 ---
 
-## Issue #10 — [ENCODER] Formato de instrução usa campos de 5 bits para registradores em vez de 6 bits
+## Issue #10 — ~~[ENCODER] Formato de instrução usa campos de 5 bits para registradores em vez de 6 bits~~ CORRIGIDA
 
+**Status:** CORRIGIDA em 28/03/2026
 **Afeta:** teste2.cms, teste.cms, fatorial.cms, gcd.cms, sort.cms
 **Etapa:** 4
 **Arquivo(s) do compilador:** encoder.c
@@ -463,6 +464,17 @@ Em `encoder.c`, alterar as funções de montagem de instruções F1 e F2 para us
 - F1: `[opcode:6][RS:6][RT:6][RD:6][Shamt:8]`
 - F2: `[opcode:6][RD:6][RS:6][Imm:14]`
 - F3 para I/O: `[opcode:6][Reg:6][zeros:20]`
+
+**Correção aplicada:**
+Em `encoder.c`, as funções de montagem foram atualizadas para seguir a ISA do processador:
+- `F1` agora usa `[opcode:6][RS:6][RT:6][RD:6][Shamt:8]`
+- `F2` agora usa `[opcode:6][RD:6][RS:6][Imm:14]`
+- `In/Out` usam `[opcode:6][Reg:6][zeros:20]`
+
+Com isso, os binários passam a codificar corretamente registradores de 6 bits, incluindo `$hi`=62 e `$lo`=61.
+
+**Nota:**
+No mesmo ajuste, `jr`/`jumpR` foi alinhada ao formato `F1` como instrução unária, sendo codificada com o registrador de salto em `RS` e com `RT=0`, `RD=0`.
 
 ---
 

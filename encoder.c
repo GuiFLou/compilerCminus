@@ -81,18 +81,25 @@ static int findLabel(const char *n){
     return -1;
 }
 
-/* ——— monta uma palavra 32 bits ——— */
-static uint32_t makeF1(uint8_t op,int rd,int rs,int rt){
-    return (op<<26)|(rd<<21)|(rs<<16)|(rt<<11);
+/* ——— monta uma palavra 32 bits no layout da ISA ——— */
+static uint32_t makeF1(uint8_t op,int rs,int rt,int rd,int shamt){
+    return ((uint32_t)op<<26)|
+           (((uint32_t)rs & 0x3F)<<20)|
+           (((uint32_t)rt & 0x3F)<<14)|
+           (((uint32_t)rd & 0x3F)<<8)|
+           ((uint32_t)shamt & 0xFF);
 }
-static uint32_t makeF2(uint8_t op,int rt,int rs,int imm){
-    return (op<<26)|(rt<<21)|(rs<<16)|((uint16_t)imm & 0xFFFF);
+static uint32_t makeF2(uint8_t op,int rd,int rs,int imm){
+    return ((uint32_t)op<<26)|
+           (((uint32_t)rd & 0x3F)<<20)|
+           (((uint32_t)rs & 0x3F)<<14)|
+           ((uint32_t)imm & 0x3FFF);
 }
 static uint32_t makeF3(uint8_t op,int addr){
     return (op<<26)|((uint32_t)addr & 0x03FFFFFF);
 }
 static uint32_t makeIO(uint8_t op,int reg){
-    return (op<<26)|(reg<<20);
+    return ((uint32_t)op<<26)|(((uint32_t)reg & 0x3F)<<20);
 }
 
 /* ——— implementação principal ——— */
@@ -152,13 +159,17 @@ int encodeAsm(const char *srcTM,const char *dstTXT){
             case F1:{
                 /* Div e Mult: dois operandos (RS, RT); resultado em High/Low; RD ignorado */
                 int rdF1 = mapReg(op1), rsF1 = mapReg(op2), rtF1 = op3 ? mapReg(op3) : 0;
-                if (!op3 && (m->op == 0b000110 || m->op == 0b000100)) /* DIV ou MULT */
-                    word = makeF1(m->op, 0, rdF1, rsF1);  /* RD=0, RS=op1, RT=op2 */
+                if (!op2 && m->op == 0b010010) /* JR/JUMPR: operando em RS */
+                    word = makeF1(m->op, rdF1, 0, 0, 0);
+                else if (!op3 && (m->op == 0b000110 || m->op == 0b000100)) /* DIV ou MULT */
+                    word = makeF1(m->op, rdF1, rsF1, 0, 0);  /* RS=op1, RT=op2, RD=0 */
                 else
-                    word = makeF1(m->op, rdF1, rsF1, rtF1);
+                    word = makeF1(m->op, rsF1, rtF1, rdF1, 0);
                 break; }
             case F2:{
                 int imm=0; if(op3){ if(isalpha(*op3)) imm=findLabel(op3)-pc-1; else imm=atoi(op3);} /* label relativo */
+                if (imm < -8192 || imm > 8191)
+                    fprintf(stderr,"[encoder] imediato F2 fora de 14 bits: %d (linha %d)\n",imm,pc+1);
                 word=makeF2(m->op, mapReg(op1), mapReg(op2), imm); break; }
             case F3:{
                 int addr=0; if(op1){ addr=isalpha(*op1)?findLabel(op1):atoi(op1);} word=makeF3(m->op,addr); break; }
