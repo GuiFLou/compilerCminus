@@ -1,0 +1,5 @@
+void main(void)
+{	int x; int y;
+	x = 5; y = 3;
+	output(x + y);
+}
