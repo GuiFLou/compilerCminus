@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
         }
 
         /* codeGen deve produzir também <base>.mem */
-        codeGen(syntaxTree, base);  /* assume que usa 'base' internamente */
+        codeGen(syntaxTree, base); 
         fclose(code);
 
         /* se --txt, renomeia <base>.mem → <base>.txt */

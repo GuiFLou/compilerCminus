@@ -313,14 +313,14 @@ static void genStmt(TreeNode *t)
     }
 }
 
-/* ---------- codigo principal ---------- */
+/* ---------- "main" code generation ---------- */
 void codeGen(TreeNode *syntaxTree, const char *base)
 {
     quadList = lastQuad = NULL;
     tempCount = 0;
     labelCount = 0;
 
-    emit("GOTO", "main", "-", "-");
+    
     genStmt(syntaxTree);
     emit("HALT", "-", "-", "-");
 

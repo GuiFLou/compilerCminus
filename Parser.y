@@ -85,8 +85,8 @@ fun_declaration     :   INT ident LPAREN params RPAREN compound_decl
                             $2->kind.stmt = functionK;
                             $2->type = integerK;          /* tipo de retorno                  */
                             $2->child[0] = $4;            /* parâmetros                       */
-                            $2->child[1] = $6;            /* corpo (compound_decl)            */
-                            aggScope($4, $2->attr.name);  /* mantém escopo correto            */
+                            $2->child[1] = $6;            
+                            aggScope($4, $2->attr.name);  
                             aggScope($6, $2->attr.name);
                         }
                     |   VOID ident LPAREN params RPAREN compound_decl
@@ -443,7 +443,7 @@ arg_list            :  arg_list COMMA expression
 ident               :   ID
                         {
                             $$ = newExpNode(IdK);          /* nó de identificador */
-                            $$->kind.exp = IdK;            /* ← GARANTE ESCALAR  */
+                            $$->kind.exp = IdK;            /* GARANTE ESCALAR  */
                             $$->attr.name = copyString(tokenString);
                             $$->type = integerK;
                         }

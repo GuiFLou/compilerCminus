@@ -1,4 +1,3 @@
-  0: (GOTO, main, -, -)
   1: (FUN, int, gcd, -)
   2: (ARG, int, u, gcd)
   3: (ARG, int, v, gcd)

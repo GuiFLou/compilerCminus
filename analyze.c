@@ -1,4 +1,4 @@
-/* analyze.c – analisador semântico com suporte a built‑ins input()/output() */
+/* analyze.c – analisador semântico */
 
 #include "globals.h"
 #include "symtab.h"

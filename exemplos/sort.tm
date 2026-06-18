@@ -1,4 +1,3 @@
-  0: (GOTO, main, -, -)
   1: (ALLOC, vet, global, 10)
   2: (FUN, int, minloc, -)
   3: (ARG, int, a, minloc)

@@ -1,0 +1,1049 @@
+%% abtex2-modelo-relatorio-tecnico.tex, v-1.9.6 laurocesar
+%% Copyright 2012-2016 by abnTeX2 group at http://www.abntex.net.br/ 
+%%
+%% This work may be distributed and/or modified under the
+%% conditions of the LaTeX Project Public License, either version 1.3
+%% of this license or (at your option) any later version.
+%% The latest version of this license is in
+%%   http://www.latex-project.org/lppl.txt
+%% and version 1.3 or later is part of all distributions of LaTeX
+%% version 2005/12/01 or later.
+%%
+%% This work has the LPPL maintenance status `maintained'.
+%% 
+%% The Current Maintainer of this work is the abnTeX2 team, led
+%% by Lauro César Araujo. Further information are available on 
+%% http://www.abntex.net.br/
+%%
+%% This work consists of the files abntex2-modelo-relatorio-tecnico.tex,
+%% abntex2-modelo-include-comandos and abntex2-modelo-references.bib
+%%
+
+% ------------------------------------------------------------------------
+% ------------------------------------------------------------------------
+% abnTeX2: Modelo de Relatório Técnico/Acadêmico em conformidade com 
+% ABNT NBR 10719:2015 Informação e documentação - Relatório técnico e/ou
+% científico - Apresentação
+% ------------------------------------------------------------------------ 
+% ------------------------------------------------------------------------
+
+\documentclass[
+	% -- opções da classe memoir --
+	12pt,				% tamanho da fonte
+	openright,			% capítulos começam em pág ímpar (insere página vazia caso preciso)
+	%twoside,			% para impressão em recto e verso. Oposto a oneside
+	a4paper,			% tamanho do papel. 
+	% -- opções da classe abntex2 --
+	%chapter=TITLE,		% títulos de capítulos convertidos em letras maiúsculas
+	%section=TITLE,		% títulos de seções convertidos em letras maiúsculas
+	%subsection=TITLE,	% títulos de subseções convertidos em letras maiúsculas
+	%subsubsection=TITLE,% títulos de subsubseções convertidos em letras maiúsculas
+	% -- opções do pacote babel --
+	english,			% idioma adicional para hifenização
+	french,				% idioma adicional para hifenização
+	spanish,			% idioma adicional para hifenização
+	brazil,				% o último idioma é o principal do documento
+	]{abntex2}
+
+
+
+% PACOTES
+
+% ---
+% Pacotes fundamentais 
+\usepackage{lmodern}			% Usa a fonte Latin Modern
+\usepackage[T1]{fontenc}		% Selecao de codigos de fonte.
+\usepackage[utf8]{inputenc}		% Codificacao do documento (conversão automática dos acentos)
+\usepackage{indentfirst}		% Indenta o primeiro parágrafo de cada seção.
+\usepackage{color}				% Controle das cores
+\usepackage{graphicx}			% Inclusão de gráficos
+\usepackage{microtype} 			% para melhorias de justificação
+% ---
+
+% Pacotes adicionais, usados no anexo do modelo de folha de identificação
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{csvsimple}
+ \usepackage{booktabs}
+ 
+\usepackage{float} % para utilizar o H de tabelas e figuras e mante-las no lugar
+% ---
+
+%----------------- PARA INSERIR ARQUIVOS DE CODIGOS -----------------%
+\usepackage{xcolor}
+% Definindo novas cores
+\definecolor{verde}{rgb}{0,0.5,0}
+% Configurando layout para mostrar codigos C++
+\usepackage{listings}
+\lstset{
+  language=Verilog, %indicar a linguagem utilizada
+  basicstyle=\ttfamily\tiny, 
+  keywordstyle=\color{blue}, 
+  stringstyle=\color{verde}, 
+  commentstyle=\color{gray}, 
+  extendedchars=true, 
+  showspaces=false, 
+  showstringspaces=false, 
+  numbers=left,
+  numberstyle=\tiny,
+  breaklines=true, 
+  backgroundcolor=\color{green!10},
+  breakautoindent=true, 
+  captionpos=b,
+  xleftmargin=0pt,
+}
+% -----------------% FIM INSERIR ARQUIVOs DE CODIGO -----------------%
+
+% Pacotes de citações
+\usepackage[brazilian,hyperpageref]{backref}	 % Paginas com as citações na bibl
+\usepackage[num]{abntex2cite}	% Citações padrão ABNT
+\citebrackets() %citação numérica entre colchetes
+% --- 
+
+
+% CONFIGURAÇÕES DE PACOTES
+
+% Configurações do pacote backref
+% Usado sem a opção hyperpageref de backref
+\renewcommand{\backrefpagesname}{Citado na(s) página(s):~}
+% Texto padrão antes do número das páginas
+\renewcommand{\backref}{}
+% Define os textos da citação
+\renewcommand*{\backrefalt}[4]{
+	\ifcase #1 %
+		Nenhuma citação no texto.%
+	\or
+		Citado na página #2.%
+	\else
+		Citado #1 vezes nas páginas #2.%
+	\fi}%
+% ---
+
+
+% Informações de dados para CAPA e FOLHA DE ROSTO
+\titulo{Implementação do Compilador C-}
+\autor{Guilherme Ferreira Lourenço \\ 143172}
+\local{São José dos Campos - Brasil}
+\data{2025}
+\instituicao{
+  Docente: Prof. Dr. Luiz Eduardo Galvão Martins
+  \par
+  Universidade Federal de São Paulo - UNIFESP
+  \par
+  Instituto de Ciência e Tecnologia - Campus São José dos Campos
+}
+\tipotrabalho{Relatório técnico}
+\preambulo{Relatório apresentado à Universidade Federal de São Paulo como parte dos requisitos para aprovação na disciplina de Laboratório de Sistemas Computacionais: Compiladores.}
+% ---
+
+% Configurações de aparência do PDF final
+
+% alterando o aspecto da cor azul
+\definecolor{blue}{RGB}{41,5,195}
+
+% informações do PDF
+\makeatletter
+\hypersetup{
+     	%pagebackref=true,
+		pdftitle={\@title}, 
+		pdfauthor={\@author},
+    	pdfsubject={\imprimirpreambulo},
+	    pdfcreator={LaTeX with abnTeX2},
+		pdfkeywords={compilador}{C-}{MIPS}{FPGA}{UNIFESP}, 
+		colorlinks=true,       		% false: boxed links; true: colored links
+    	linkcolor=blue,          	% color of internal links
+    	citecolor=blue,        		% color of links to bibliography
+    	filecolor=magenta,      		% color of file links
+		urlcolor=blue,
+		bookmarksdepth=4
+}
+\makeatother
+% --- 
+
+
+% Espaçamentos entre linhas e parágrafos 
+
+% O tamanho do parágrafo é dado por:
+\setlength{\parindent}{1.3cm}
+
+% Controle do espaçamento entre um parágrafo e outro:
+\setlength{\parskip}{0.2cm}  % tente também \onelineskip
+
+% compila o indice
+\makeindex
+% ---
+
+
+
+% ------------------------------------------------
+% Início do documento
+\begin{document}
+
+% Seleciona o idioma do documento (conforme pacotes do babel)
+%\selectlanguage{english}
+\selectlanguage{brazil}
+
+% Retira espaço extra obsoleto entre as frases.
+\frenchspacing 
+
+% ----------------------------------------------------------
+% ELEMENTOS PRÉ-TEXTUAIS
+% ----------------------------------------------------------
+% \pretextual
+
+% ---
+% Capa
+\imprimircapa
+% ---
+
+% ---
+% Folha de rosto
+\imprimirfolhaderosto*
+% ---
+
+%------LISTAS SÃO OPCIONAIS---------
+% inserir lista de ilustrações
+\pdfbookmark[0]{\listfigurename}{lof}
+\listoffigures*
+\clearpage
+
+% inserir lista de tabelas
+\pdfbookmark[0]{\listtablename}{lot}
+\listoftables*
+\clearpage
+% ---
+
+%SUMÁRIO É OBRIGATÓRIO
+% inserir o sumario
+\pdfbookmark[0]{\contentsname}{toc}
+\tableofcontents*
+% ---
+
+
+% ----------------------------------------------------------
+% ELEMENTOS TEXTUAIS
+\textual
+
+% ----------------------------------------------------------
+\chapter{Introdução}
+O desenvolvimento de compiladores é uma área fundamental dentro da computação, pois viabiliza a tradução de linguagens de programação de alto nível, utilizadas por humanos, em linguagens de baixo nível, que podem ser diretamente compreendidas e executadas por máquinas. Este processo é essencial para permitir uma interação eficiente entre o programador e o hardware computacional, possibilitando o desenvolvimento de soluções computacionais.
+
+Neste contexto, o presente trabalho apresenta o desenvolvimento em linguagem C de um compilador para a linguagem C-, integrado a um processador MIPS monocíclico personalizado. O compilador traduz o código-fonte em quádruplas (código intermediário), assembly MIPS-Lite e binário de 32 bits pronto para inicialização da ROM do processador implementado em FPGA Intel.
+
+A linguagem C- aceita tipos \texttt{int} e \texttt{void}, vetores, funções com parâmetros escalares ou por referência, além das primitivas \texttt{input()} e \texttt{output()}. Todo programa deve conter a função \texttt{main(void)}. O pipeline completo é acionado pelo comando \texttt{./compilador --txt arquivo.cms}, gerando os arquivos \texttt{.tm}, \texttt{.s} e \texttt{.txt}.
+
+O processador foi implementado em Verilog e validado em simulação e FPGA, executando programas compilados como fatorial, ordenação, MDC e casos de teste da disciplina. Dessa forma, o relatório demonstra a interdependência entre compilador e arquitetura alvo, reforçando conceitos de compiladores e organização de computadores.
+
+A seguir, descreve-se brevemente o contrato entre compilador e hardware, ou seja, a arquitetura escolhida, além das fases de análise e síntese do compilador e a conclusão do projeto.
+
+\chapter{Arquitetura Alvo do Compilador}
+
+O hardware, que foi implementado em Verilog e executado em FPGA Intel, possui uma arquitetura que o compilador precisa respeitar ao gerar assembly: registradores, memória, instruções e codificação binária.
+
+\section{Visão geral}
+
+A arquitetura alvo é um MIPS monocíclico com memória Harvard (instruções e dados separados). Cada instrução ocupa 32 bits fixos. O compilador produz assembly MIPS-Lite (\texttt{.s}), que o montador \texttt{encoder.c} converte em binário (\texttt{.txt}) para carga na ROM do processador.
+
+Características relevantes para a geração de código:
+\begin{itemize}
+    \item Palavras de 32 bits; endereçamento por palavra (não por byte);
+    \item Banco de 64 registradores; o compilador utiliza um subconjunto convencionado;
+    \item Variáveis globais e locais acessadas via \texttt{offset(\$gp)};
+    \item Parâmetros, \texttt{\$ra} e argumentos de chamada na pilha (\texttt{\$sp});
+    \item Entrada e saída via instruções \texttt{in} e \texttt{out};
+    \item \texttt{mult} e \texttt{div} deixam quociente em \texttt{\$lo} (parte alta em \texttt{\$hi});
+    \item \texttt{main} encerra com \texttt{hlt}; demais funções retornam com \texttt{jr \$ra}.
+\end{itemize}
+
+\section{Registradores e memória}
+
+A Tabela~\ref{tab:registradores} lista os registradores efetivamente usados pelo compilador. Temporários das quádruplas (\texttt{t0}, \texttt{t1}, \ldots) mapeiam circularmente para \texttt{\$t0}--\texttt{\$t9}.
+
+\begin{table}[H]
+\centering
+\caption{Registradores utilizados pelo compilador}
+\label{tab:registradores}
+\begin{tabular}{|l|l|p{7cm}|}
+\hline
+\textbf{Registrador} & \textbf{Nº} & \textbf{Papel na convenção de código} \\
+\hline
+\texttt{\$zero} & 0 & Constante zero \\
+\texttt{\$v0} & 2 & Valor de retorno de funções \texttt{int} \\
+\texttt{\$t0}--\texttt{\$t9} & 8--17 & Temporários das quádruplas \\
+\texttt{\$gp} & 28 & Base da memória de dados (variáveis globais e locais) \\
+\texttt{\$sp} & 29 & Pilha: \texttt{\$ra}, parâmetros e argumentos \\
+\texttt{\$ra} & 31 & Endereço de retorno após \texttt{jal} \\
+\texttt{\$lo} / \texttt{\$hi} & 61 / 62 & Resultado de \texttt{mult} / \texttt{div} \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Layout de memória.} Globais e locais escalares recebem \texttt{memloc} na tabela de símbolos e são acessados como \texttt{lw/sw offset(\$gp)}. Vetores globais ocupam bloco contíguo a partir de \texttt{\$gp}. Parâmetros de função residem em \texttt{offset(\$sp)}, com deslocamento ajustado dinamicamente quando o \emph{caller} empilha argumentos (\texttt{stackDelta} em \texttt{asmgen.c}).
+
+\textbf{Convenção de chamada.} O \emph{callee} salva \texttt{\$ra} no \emph{prologue} (\texttt{addi \$sp,-1; sw \$ra,0(\$sp)}). O \emph{caller} empilha argumentos (\texttt{PARAM}), executa \texttt{jal}, desempilha e lê o retorno em \texttt{\$v0}. Funções \texttt{void} ou com caminhos que terminam em \texttt{RET} emitem \texttt{jr \$ra}; \texttt{main} termina com \texttt{hlt}.
+
+\section{Funcionamento do processador}
+
+Em cada ciclo, o processador busca a instrução apontada pelo PC, decodifica o \emph{opcode}, lê operandos de registradores ou imediato, executa a operação na ULA (ou acesso à memória / E/S) e atualiza o PC --- inclusive em saltos condicionais (\texttt{beq}/\texttt{bne}) e incondicionais (\texttt{j}/\texttt{jal}). A \autoref{fig:MyDevice} resume esse fluxo no datapath, sem detalhar implementação em Verilog.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{Imagens/Datapath.png}
+    \legend{Visão funcional do datapath --- contrato entre assembly gerado e hardware}
+    \caption{Fonte: Autor}
+    \label{fig:MyDevice}
+\end{figure}
+
+\section{Formatos de instrução}
+
+O montador codifica cada instrução em um dos formatos abaixo. O compilador e o \texttt{encoder.c} devem respeitar esses campos ao gerar \texttt{.s} e \texttt{.txt}.
+
+\begin{table}[H]
+\centering
+\caption{Formato F1 --- tipo registrador (R)}
+\label{tab:formato-f1}
+    \begin{tabular}{|c|c|c|c|c|}
+     \hline
+        31-26 & 25-20 & 19-14 & 13-8 & 7-0 \\
+        \hline \hline
+        Opcode & RD & RS & RT & Shamt \\
+     \hline
+    \end{tabular}
+\legend{Ex.: \texttt{add}, \texttt{sub}, \texttt{mult}, \texttt{div}, \texttt{slt}, \texttt{jr}}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{Formato F2 --- imediato (I)}
+    \label{tab:formato-f2}
+    \begin{tabular}{|c|c|c|c|}
+        \hline
+        31-26 & 25-20 & 19-14 & 13-0 \\
+        \hline \hline
+        Opcode & RD & RS & Imediato (14 bits) \\
+        \hline
+    \end{tabular}
+\legend{Ex.: \texttt{addi}, \texttt{lw}, \texttt{sw}, \texttt{beq}, \texttt{bne}, \texttt{move}}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Formato F3 --- salto (J)}
+\label{tab:formato-f3}
+    \begin{tabular}{|c|c|}
+     \hline
+        31-26 & 25-0 \\
+        \hline \hline
+        Opcode & Endereço (26 bits) \\
+     \hline
+    \end{tabular}
+\legend{Ex.: \texttt{j}, \texttt{jal}, \texttt{nop}, \texttt{hlt}}
+\end{table}
+
+\section{Instruções emitidas pelo compilador}
+
+A Tabela~\ref{tab:conjunto-instrucoes} reúne as instruções assembly que o \emph{back-end} pode gerar e seus \emph{opcodes}. Saltos condicionais usam \texttt{beq}/\texttt{bne} com \textbf{offset relativo} ao PC; \texttt{j}/\texttt{jal} usam endereço absoluto. Instruções de E/S (\texttt{in}/\texttt{out}) usam formato dedicado FI no montador.
+
+\begin{table}[H]
+\centering
+\caption{Instruções assembly geradas pelo compilador}
+\label{tab:conjunto-instrucoes}
+\small
+    \begin{tabular}{|l|l|c|p{4.8cm}|}
+     \hline
+        \textbf{Assembly} & \textbf{Formato} & \textbf{OP} & \textbf{Uso no compilador} \\
+        \hline \hline
+        add, sub & F1 & 000000, 000010 & Aritmética; cópia via \texttt{add rd,rs,\$zero} \\
+        addi & F2 & 000001 & Constantes e ajuste de pilha \\
+        mult, div & F1 & 000100, 000110 & Produto/quociente em \texttt{\$lo} \\
+        slt & F1 & 011001 & Comparações \texttt{<}, laços \texttt{while} \\
+        lw, sw & F2 & 001111, 010000 & Variáveis em \texttt{offset(\$gp)}; vetores \\
+        beq, bne & F2 & 010100, 010101 & \texttt{IFF}, \texttt{EQ}/\texttt{NEQ} \\
+        move & F2 & 010110 & Cópia entre registradores \\
+        j, jal & F3 & 010001, 010011 & \texttt{GOTO}, chamadas de função \\
+        jr & F1 & 010010 & Retorno (\texttt{jr \$ra}) \\
+        in, out & FI & 011010, 011011 & \texttt{input()}, \texttt{output()} \\
+        hlt & F3 & 011000 & Término de \texttt{main} \\
+     \hline
+    \end{tabular}
+\legend{Demais instruções do ISA existem no processador, mas não são emitidas pelo compilador atual.}
+\end{table}
+
+\section{Codificação binária}
+
+O \texttt{encoder.c} realiza duas passagens sobre o \texttt{.s}: coleta \emph{labels} (incluindo \texttt{.L\_eq\_*}) e monta palavras de 32 bits. \texttt{BEQ}/\texttt{BNE} recebem offset relativo \texttt{addr(label) - PC - 1}; \texttt{J}/\texttt{JAL} recebem endereço absoluto. A Tabela~\ref{tab:codigo-executavel-alvo} exemplifica a saída; o Apêndice~B traz trecho real de \texttt{fatorial.txt}.
+
+\begin{table}[H]
+\centering
+\caption{Exemplos de codificação binária}
+\label{tab:codigo-executavel-alvo}
+\small
+\begin{tabular}{|p{3.2cm}|c|c|p{4.8cm}|}
+\hline
+\textbf{Instrução Assembly} & \textbf{Formato} & \textbf{OP} & \textbf{Observação} \\
+\hline
+add \$t1,\$t2,\$t3 & F1 & 000000 & Campos RS, RT, RD \\
+\hline
+addi \$t1,\$t2,4 & F2 & 000001 & Imediato de 14 bits \\
+\hline
+sw \$t1,8(\$t2) & F2 & 010000 & Deslocamento + base \\
+\hline
+beq \$t1,\$t2,L1 & F2 & 010100 & Offset relativo ao PC \\
+\hline
+j main & F3 & 010001 & Endereço absoluto \\
+\hline
+out \$t1 & FI & 011011 & Registrador de saída \\
+\hline
+\end{tabular}
+\end{table}
+
+
+
+
+\chapter{Compilador: Fase de Análise}
+
+A fase de análise transforma o arquivo \texttt{.cms} em uma AST validada, pronta para o \emph{back-end}. O \texttt{main.c} orquestra as etapas em sequência: \texttt{parse()} (Flex + Bison), \texttt{buildSymtab()} e \texttt{typeCheck()}. Qualquer erro define a flag global \texttt{Error} e impede a geração de código.
+
+Os diagramas SysML abaixo resumem a organização modular; as subseções seguintes detalham o comportamento de cada etapa com base nos arquivos \texttt{Scanner.l}, \texttt{Parser.y}, \texttt{analyze.c} e \texttt{symtab.c}.
+
+\section{Modelagem}
+
+\subsection{Diagrama de Blocos (SysML)}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth,height=0.7\textheight,keepaspectratio]{Imagens/Compilador_Analise_blocos_sysml.png}
+    \legend{Diagrama de Blocos da fase de análise do projeto}
+    \caption{Fonte: Autor}
+    \label{fig:AnaliseBloc}
+\end{figure}
+
+\subsection{Diagramas de Atividades (SysML)}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{Imagens/Compilador_Analise_sysml.png}
+    \legend{Diagrama de Atividades da fase de análise do projeto}
+    \caption{Fonte: Autor}
+    \label{fig:AnaliseAtiv}
+\end{figure}
+
+\section{Análise Léxica}
+
+\subsection{Papel e implementação}
+
+O analisador léxico (\texttt{Scanner.l}, gerado pelo Flex) divide o fluxo de caracteres em \emph{tokens} --- unidades mínimas com significado para o parser. A função pública \texttt{getToken()} encapsula \texttt{yylex()}: na primeira chamada, associa a entrada ao arquivo fonte (\texttt{yyin = source}), incrementa o contador de linhas e, a cada token, copia o lexema para \texttt{tokenString} (limite \texttt{MAXTOKENLEN}).
+
+Quando \texttt{TraceScan} está ativo, cada token é listado em \texttt{listing} com número de linha, o que facilita depuração de programas \texttt{.cms}.
+
+\subsection{Regras de reconhecimento}
+
+Espaços, tabulações e retornos de carro são descartados; \texttt{newline} incrementa \texttt{lineno}. Comentários de bloco \texttt{/* ... */} consomem caracteres até encontrar \texttt{*/}, também contabilizando quebras de linha internas.
+
+Identificadores seguem \texttt{[a-zA-Z]+} (sem dígitos no nome). Literais inteiros são sequências \texttt{[0-9]+}. Qualquer caractere fora do conjunto aceito produz \texttt{ERROR}, encerrando a compilação na fase seguinte.
+
+Palavras reservadas possuem regras literais \emph{antes} da regra genérica de \texttt{ID}, evitando que \texttt{while} ou \texttt{int} sejam classificados como identificadores.
+
+\subsection{Conjunto de tokens}
+
+A Tabela~\ref{tab:tokens} agrupa os tokens entregues ao Bison. Operadores relacionais retornam tipo \texttt{booleanK} já na AST (capítulo seguinte); aqui o lexer apenas distingue os lexemas.
+
+\begin{table}[H]
+\centering
+\caption{Tokens reconhecidos pelo analisador léxico}
+\label{tab:tokens}
+\small
+\begin{tabular}{|l|l|p{3.5cm}|}
+\hline
+\textbf{Categoria} & \textbf{Exemplos / token} & \textbf{Observação} \\
+\hline
+Reservadas & \texttt{if}, \texttt{else}, \texttt{while}, \texttt{return}, \texttt{int}, \texttt{void} & Palavras-chave da gramática C- \\
+\hline
+Identificador & \texttt{ID} & Nomes de variáveis, funções e parâmetros \\
+\hline
+Literal & \texttt{NUM} & Constantes inteiras decimais \\
+\hline
+Atribuição & \texttt{ASSIGN} (\texttt{=}) & Distinto de \texttt{EQ} (\texttt{==}) \\
+\hline
+Relacionais & \texttt{LT}, \texttt{LTE}, \texttt{GT}, \texttt{GTE}, \texttt{EQ}, \texttt{NE} & Usados em \texttt{if} e expressões \\
+\hline
+Aritméticos & \texttt{PLUS}, \texttt{MINUS}, \texttt{TIMES}, \texttt{OVER} & \texttt{+}, \texttt{-}, \texttt{*}, \texttt{/} \\
+\hline
+Delimitadores & \texttt{LPAREN/RPAREN}, \texttt{LBRACKET/RBRACKET}, \texttt{LKEYS/RKEYS} & \texttt{()}, \texttt{[]}, \texttt{\{\}} \\
+\hline
+Pontuação & \texttt{SEMI}, \texttt{COMMA} & \texttt{;}, \texttt{,} \\
+\hline
+Controle & \texttt{ENDFILE}, \texttt{ERROR} & Fim de arquivo ou caractere ilegal \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Análise Sintática}
+
+\subsection{Gramática e construção da AST}
+
+A gramática LALR está em \texttt{Parser.y}. O símbolo inicial \texttt{program} reduz uma \texttt{list\_declaration}: sequência de declarações globais (variáveis ou funções) ligadas pelo ponteiro \texttt{sibling} da AST.
+
+Cada nó é um \texttt{TreeNode} (\texttt{globals.h}) com até três filhos (\texttt{child[0..2]}), irmãos (\texttt{sibling}), número de linha e campos em \texttt{attr} (nome, escopo, valor, tamanho de vetor). Dois eixos classificam o nó:
+\begin{itemize}
+    \item \texttt{nodekind}: \texttt{StmtK} (comando/declaração) ou \texttt{ExpK} (expressão);
+    \item \texttt{kind.stmt} ou \texttt{kind.exp}: subtipo (\texttt{functionK}, \texttt{whileK}, \texttt{AssignK}, \texttt{OpK}, \texttt{IdK}, \texttt{vectorK}, etc.).
+\end{itemize}
+
+Declarações de variável global (\texttt{int x;} ou \texttt{int vet[10];}) produzem nó \texttt{typeK} cujo filho é \texttt{variableK}; o campo \texttt{attr.len} guarda o tamanho do vetor. Funções (\texttt{int f(...)} ou \texttt{void g(...)}) usam \texttt{functionK}: \texttt{child[0]} aponta para parâmetros, \texttt{child[1]} para o composto \texttt{\{ ... \}}.
+
+\subsection{Escopos na árvore}
+
+Antes da análise semântica, o parser anota escopos com \texttt{aggScope} (\texttt{util.c}): parâmetros e corpo de uma função recebem \texttt{attr.scope} igual ao nome da função; declarações no nível externo permanecem com escopo \texttt{global} (padrão ao criar o nó). Essa marcação permite à tabela de símbolos distinguir homônimos em funções diferentes.
+
+\subsection{Expressões e comandos}
+
+A hierarquia de expressões respeita precedência via níveis da gramática:
+\texttt{expression} $\rightarrow$ \texttt{simple\_expression} $\rightarrow$ \texttt{sum\_expression} $\rightarrow$ \texttt{term} $\rightarrow$ \texttt{factor}.
+Operadores relacionais (\texttt{==}, \texttt{!=}, \texttt{<}, \ldots) formam nó \texttt{OpK} com \texttt{type = booleanK}; soma e produto produzem \texttt{integerK}.
+Chamadas \texttt{id(...)} viram \texttt{callK}; indexação \texttt{vet[i]} redefine o identificador como \texttt{vectorK} com índice em \texttt{child[0]}.
+
+Comandos suportados: atribuição (\texttt{AssignK}), \texttt{if}/\texttt{else} (\texttt{IfK}), \texttt{while} (\texttt{whileK}), \texttt{return} (\texttt{returnK}) e blocos aninhados (\texttt{compound\_decl}). Protótipos sem corpo \emph{não} fazem parte da gramática --- toda função deve incluir \texttt{\{ ... \}}.
+
+\subsection{Saída da análise sintática}
+
+A função \texttt{parse()} devolve a raiz \texttt{savedTree}. Com \texttt{TraceParse}, \texttt{printTree} exibe a AST indentada (filhos abaixo, irmãos ao lado), o que permite verificar se a estrutura de \texttt{fatorial.cms}, por exemplo, reflete corretamente o \texttt{while} aninhado às atribuições iniciais.
+
+\section{Análise Semântica}
+
+\subsection{Duas passagens sobre a AST}
+
+A análise semântica (\texttt{analyze.c}) percorre a mesma AST em duas passagens genéricas (\texttt{traverse}), separando responsabilidades:
+
+\begin{enumerate}
+    \item \textbf{\texttt{buildSymtab}} --- insere símbolos na tabela hash (\texttt{symtab.c}), atribui \texttt{memloc} sequencial e valida declarações duplicadas;
+    \item \textbf{\texttt{typeCheck}} --- verifica usos (variáveis não declaradas, condições de \texttt{if}, atribuições inválidas).
+\end{enumerate}
+
+Somente se \texttt{Error == FALSE} após ambas as passagens o \texttt{main.c} invoca \texttt{codeGen}.
+
+\subsection{Tabela de símbolos}
+
+A tabela usa encadeamento externo com 211 buckets; a função hash combina nome e escopo. Cada entrada (\texttt{BucketListRec}) armazena: \texttt{name}, \texttt{scope}, \texttt{typeID} (\texttt{variable}, \texttt{vector}, \texttt{function}, \texttt{call}, \ldots), \texttt{typeData} (\texttt{integer}, \texttt{void}, \texttt{void(int)}, \ldots), \texttt{memloc} e lista de linhas de uso.
+
+Na inicialização (\texttt{symtabInit}), são inseridas as \emph{built-ins}:
+\texttt{input()} como \texttt{function → integer} e \texttt{output(int)} como \texttt{function → void(int)}, ambas no escopo \texttt{global}. Assim, chamadas de E/S não exigem declaração no fonte.
+
+Variáveis escalares recebem um \texttt{memloc}; vetores reservam bloco contíguo (\texttt{location += attr.len}). Funções registram tipo de retorno, mas não consomem slot de dados da mesma forma. O endereço \texttt{memloc} será consumido pelo \texttt{cgen.c} ao emitir \texttt{ALLOC} --- não é recalculado na síntese.
+
+\subsection{Regras verificadas}
+
+A Tabela~\ref{tab:erros-sem} resume as principais mensagens emitidas. Erros de declaração ocorrem na primeira passagem; erros de uso, na segunda.
+
+\begin{table}[H]
+\centering
+\caption{Verificações semânticas principais}
+\label{tab:erros-sem}
+\small
+\begin{tabular}{|p{3.2cm}|p{9cm}|}
+\hline
+\textbf{Situação} & \textbf{Comportamento} \\
+\hline
+Redeclaração & Mesmo nome no mesmo escopo (ou global) $\rightarrow$ \emph{Error 4: Already declared} \\
+\hline
+Identificador inexistente & Uso de variável/vetor não inserido $\rightarrow$ \emph{Error 1: it was not declared} \\
+\hline
+Chamada inválida & Função inexistente $\rightarrow$ \emph{Error 5: Invalid Call} \\
+\hline
+\texttt{main} ausente & Nenhuma função \texttt{main} global $\rightarrow$ \emph{Error: main was not declared} \\
+\hline
+\texttt{if} não booleano & Teste com tipo \texttt{integerK} em ambos os lados $\rightarrow$ aviso de teste não booleano \\
+\hline
+Atribuição de \texttt{void} & RHS é chamada a função \texttt{void} $\rightarrow$ \emph{assignment of void return} \\
+\hline
+\end{tabular}
+\end{table}
+
+Parâmetros podem ser escalares (\texttt{int p}) ou vetores (\texttt{int a[]}); o parser marca vetores-parâmetro para acesso por referência na geração de código (\texttt{ADDR} + \texttt{PARAM}), tratado no Capítulo~4.
+
+Com \texttt{TraceAnalyze}, após \texttt{buildSymtab} a tabela completa é impressa via \texttt{printSymTab}, permitindo auditar escopos e \texttt{memloc} antes da geração de quádruplas.
+
+\chapter{Compilador: Fase de Síntese}
+
+A fase de síntese transforma a AST validada em código executável pelo processador. O fluxo é orquestrado por \texttt{main.c}: \texttt{cgen.c} gera quádruplas (\texttt{.tm}), \texttt{asmgen.c} traduz para assembly (\texttt{.s}) e \texttt{encoder.c} monta o binário (\texttt{.txt}).
+
+\section{Modelagem}
+
+\subsection{Diagrama de Blocos (SysML)}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{Imagens/Compilador_Sintese_blocos_sysml.png}
+    \legend{Diagrama de Blocos da fase de síntese do projeto}
+    \caption{Fonte: Autor}
+    \label{fig:SinteseBloc}
+\end{figure}
+
+\subsection{Diagramas de Atividades (SysML)}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{Imagens/Compilador_Sintese_sysml.png}
+    \legend{Diagrama de Atividades da fase de síntese do projeto}
+    \caption{Fonte: Autor}
+    \label{fig:SinteseAtiv}
+\end{figure}
+
+\section{Geração do Código Intermediário}
+
+O código intermediário usa quádruplas \texttt{(op, arg1, arg2, result)} geradas em \texttt{cgen.c}. Temporários seguem o padrão \texttt{t0}, \texttt{t1}, \ldots; rótulos, \texttt{L0}, \texttt{L1}, \ldots
+
+A Tabela~\ref{tab:quadruplas} resume as principais operações emitidas. O arquivo completo está no Apêndice~A.
+
+\begin{table}[H]
+\centering
+\caption{Principais quádruplas do compilador}
+\label{tab:quadruplas}
+\small
+\begin{tabular}{|l|l|p{6.5cm}|}
+\hline
+\textbf{op} & \textbf{Tipo} & \textbf{Significado} \\
+\hline
+FUN / ARG / END & Controle & Declaração de função, parâmetro e fim \\
+ALLOC & Memória & Aloca variável ou vetor no escopo \\
+ASSIGN / LOAD / STORE & Transf./Mem. & Literal, leitura e escrita de escalares \\
+LOADV / STOREV / ADDR & Memória & Acesso indexado e endereço de vetor \\
+ADD, SUB, MUL, DIV, SLT, EQ, NEQ & Aritm./Lógica & Operações aritméticas e relacionais \\
+IFF / GOTO / LAB & Controle & Desvios condicionais e incondicionais \\
+PARAM / CALL / RET & Chamada & Convenção de chamada de funções \\
+CALL\_I / CALL\_O & I/O & \texttt{input()} e \texttt{output()} \\
+HALT & Controle & Término do programa \\
+\hline
+\end{tabular}
+\end{table}
+
+Por exemplo, \texttt{n = 5} gera \texttt{(ASSIGN, 5, -, t0)} seguido de \texttt{(STORE, t0, -, n)}, e não atribuição direta à variável.
+
+\section{Geração do Código Assembly}
+
+\texttt{asmgen.c} traduz cada quádrupla para instruções MIPS-Lite. Registradores utilizados: \texttt{\$t0}--\texttt{\$t9} (temporários), \texttt{\$gp} (base de dados), \texttt{\$sp} (pilha), \texttt{\$ra} (retorno), \texttt{\$v0} (valor de retorno) e \texttt{\$lo} (resultado de \texttt{mult}/\texttt{div}).
+
+Variáveis globais e locais não-parâmetro residem em \texttt{offset(\$gp)} conforme \texttt{memloc} da tabela de símbolos. Parâmetros e \texttt{\$ra} ficam na pilha. A convenção de chamada empilha argumentos, executa \texttt{jal}, desempilha argumentos e retorna via \texttt{jr \$ra}; \texttt{main} termina com \texttt{hlt}.
+
+Comparações \texttt{EQ}/\texttt{NEQ} geram sequências com \emph{dot-labels} (\texttt{.L\_eq\_N}). Desvios \texttt{IFF} viram \texttt{beq cond,\$zero,label}. Multiplicação usa \texttt{mult} + \texttt{move rd,\$lo}.
+
+\section{Geração do Código Executável}
+
+\texttt{encoder.c} implementa um montador em duas passagens sobre o \texttt{.s}: na primeira, coleta endereços de \emph{labels}; na segunda, codifica cada instrução em 32 bits conforme F1, F2, F3 ou FI (E/S).
+
+A Tabela~\ref{tab:codigo-executavel} exemplifica a codificação. Os valores binários de \texttt{fatorial.txt} foram obtidos diretamente do compilador.
+
+\begin{table}[H]
+\centering
+\caption{Exemplo de geração de código executável}
+\label{tab:codigo-executavel}
+\small
+\begin{tabular}{|p{3.2cm}|c|c|p{4.8cm}|}
+\hline
+\textbf{Instrução Assembly} & \textbf{Tipo} & \textbf{OP} & \textbf{Código Binário (exemplo)} \\
+\hline
+add \$t1,\$t2,\$t3 & Aritmética & 000000 & 000000 01010 01011 01001 00000 000000 \\
+\hline
+addi \$t1,\$t2,4 & Aritmética & 000001 & 000001 01010 01001 0000000000000100 \\
+\hline
+sw \$t1,8(\$t2) & Memória & 010000 & 010000 01010 01001 0000000000001000 \\
+\hline
+beq \$t1,\$t2,L1 & Salto Cond. & 010100 & offset relativo de 14 bits \\
+\hline
+j 1024 & Salto & 010001 & 010001 000000000001000000000000 \\
+\hline
+out \$t1 & I/O & 011011 & 011011 00000 01001 0000000000000000 \\
+\hline
+\end{tabular}
+\end{table}
+
+
+
+\section{Gerenciamento de Memória}
+
+O gerenciamento de memória é feito em tempo de compilação pela tabela de símbolos e refletido nas quádruplas \texttt{ALLOC}.
+
+\textbf{Variáveis globais} (incluindo vetores como \texttt{vet[10]}) recebem endereços fixos a partir de \texttt{\$gp}. Exemplo: em \texttt{sort.cms}, o vetor ocupa \texttt{\$gp+0..9} e variáveis de \texttt{main} usam offsets posteriores.
+
+\textbf{Variáveis locais} escalares de função também usam \texttt{offset(\$gp)} dentro do escopo da função, com offsets atribuídos sequencialmente em \texttt{memloc}.
+
+\textbf{Parâmetros} de função ficam na pilha (\texttt{offset(\$sp)}), com cálculo dinâmico de deslocamento conforme argumentos empilhados em subchamadas (\texttt{stackDelta} em \texttt{asmgen.c}).
+
+\textbf{Temporários} das quádruplas mapeiam circularmente para \texttt{\$t0}--\texttt{\$t9}, reduzindo pressão sobre a memória durante expressões complexas.
+
+\chapter{Exemplos de Compilação}
+
+Esta seção apresenta trechos reais gerados pelo compilador para três programas validados: fatorial (\texttt{fatorial.cms}), ordenação (\texttt{sort.cms}) e MDC (\texttt{gcd.cms}). Os arquivos completos estão em \texttt{exemplos/*.tm}, \texttt{*.s} e \texttt{*.txt}.
+
+\section{Exemplo 1: Fatorial}
+
+O programa calcula $5! = 120$ e imprime o resultado. A Tabela~\ref{tab:fatorial} mostra correspondência entre trechos do fonte, quádruplas e assembly gerados.
+
+\begin{table}[H]
+\centering
+\caption{Correspondência entre código fonte, quádruplas e assembly — Fatorial}
+\label{tab:fatorial}
+\footnotesize
+\begin{tabular}{|p{0.28\linewidth}|p{0.36\linewidth}|p{0.30\linewidth}|}
+\hline
+\textbf{Código Fonte} & \textbf{Quádruplas (\texttt{.tm})} & \textbf{Assembly (\texttt{.s})} \\
+\hline
+\begin{verbatim}
+n = 5;
+result = 1;
+\end{verbatim}
+&
+\begin{verbatim}
+(ASSIGN, 5, -, t0)
+(STORE, t0, -, n)
+(ASSIGN, 1, -, t1)
+(STORE, t1, -, result)
+\end{verbatim}
+&
+\begin{verbatim}
+addi $t0,$zero,5
+sw   $t0,1($gp)
+addi $t1,$zero,1
+sw   $t1,2($gp)
+\end{verbatim}
+\\
+\hline
+\begin{verbatim}
+while (n > 0) {
+  result = result * n;
+  n = n - 1;
+}
+\end{verbatim}
+&
+\begin{verbatim}
+(LAB, L0, -, -)
+(LOAD, n, -, t2)
+(ASSIGN, 0, -, t3)
+(SLT, t3, t2, t4)
+(IFF, t4, L1, -)
+(LOAD, result, -, t5)
+(LOAD, n, -, t6)
+(MUL, t5, t6, t7)
+(STORE, t7, -, result)
+(SUB, t8, t9, t10) ...
+(GOTO, L0, -, -)
+(LAB, L1, -, -)
+\end{verbatim}
+&
+\begin{verbatim}
+L0:
+lw   $t2,1($gp)
+addi $t3,$zero,0
+slt  $t4,$t3,$t2
+beq  $t4,$zero,L1
+mult $t5,$t6
+move $t7,$lo
+sub  $t0,$t8,$t9
+j    L0
+L1:
+\end{verbatim}
+\\
+\hline
+\begin{verbatim}
+output(result);
+\end{verbatim}
+&
+\begin{verbatim}
+(LOAD, result, -, t11)
+(PARAM, t11, -, -)
+(CALL_O, t11, -, -)
+\end{verbatim}
+&
+\begin{verbatim}
+lw   $t1,2($gp)
+out  $t1
+hlt
+\end{verbatim}
+\\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Exemplo 2: Ordenação (\texttt{sort.cms})}
+
+O programa lê 10 inteiros, ordena com \texttt{sort}/\texttt{minloc} e imprime o vetor. O intermediário completo possui 130 quádruplas; a Tabela~\ref{tab:sort} destaca a leitura do vetor e a chamada de \texttt{sort}.
+
+\begin{table}[H]
+\centering
+\caption{Trechos de compilação — Ordenação}
+\label{tab:sort}
+\footnotesize
+\begin{tabular}{|p{0.28\linewidth}|p{0.36\linewidth}|p{0.30\linewidth}|}
+\hline
+\textbf{Código Fonte} & \textbf{Quádruplas} & \textbf{Assembly} \\
+\hline
+\begin{verbatim}
+vet[i] = input();
+\end{verbatim}
+&
+\begin{verbatim}
+(CALL_I, -, -, t44)
+(LOAD, i, -, t45)
+(STOREV, t44, t45, vet)
+\end{verbatim}
+&
+\begin{verbatim}
+in   $t4
+lw   $t5,25($gp)
+add  $t7,$gp,$t5
+sw   $t4,0($t7)
+\end{verbatim}
+\\
+\hline
+\begin{verbatim}
+sort(vet, 0, 10);
+\end{verbatim}
+&
+\begin{verbatim}
+(ADDR, vet, -, t49)
+(PARAM, t49, -, -)
+(PARAM, 0, -, -)
+(PARAM, 10, -, -)
+(CALL, sort, 3, -)
+\end{verbatim}
+&
+\begin{verbatim}
+addi $t9,$gp,0
+sw   $t9,0($sp)
+sw   $t0,0($sp)
+sw   $t1,0($sp)
+jal  sort
+addi $sp,$sp,3
+\end{verbatim}
+\\
+\hline
+\begin{verbatim}
+output(vet[i]);
+\end{verbatim}
+&
+\begin{verbatim}
+(LOADV, vet, t56, t57)
+(PARAM, t57, -, -)
+(CALL_O, t57, -, -)
+\end{verbatim}
+&
+\begin{verbatim}
+lw   $t7,0($t9)
+out  $t7
+\end{verbatim}
+\\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Exemplo 3: Máximo Divisor Comum (GCD)}
+
+Implementação recursiva de Euclides. A Tabela~\ref{tab:gcd} mostra o caso base, a chamada recursiva e o \texttt{main}.
+
+\begin{table}[H]
+\centering
+\caption{Trechos de compilação — GCD (Euclides)}
+\label{tab:gcd}
+\footnotesize
+\begin{tabular}{|p{0.28\linewidth}|p{0.36\linewidth}|p{0.30\linewidth}|}
+\hline
+\textbf{Código Fonte} & \textbf{Quádruplas} & \textbf{Assembly} \\
+\hline
+\begin{verbatim}
+if (v == 0) return u;
+\end{verbatim}
+&
+\begin{verbatim}
+(LOAD, v, -, t0)
+(ASSIGN, 0, -, t1)
+(EQ, t0, t1, t2)
+(IFF, t2, L0, -)
+(LOAD, u, -, t3)
+(RET, t3, -, -)
+\end{verbatim}
+&
+\begin{verbatim}
+lw   $t0,1($sp)
+beq  $t2,$zero,L0
+lw   $t3,2($sp)
+add  $v0,$t3,$zero
+jr   $ra
+\end{verbatim}
+\\
+\hline
+\begin{verbatim}
+return gcd(v, u-u/v*v);
+\end{verbatim}
+&
+\begin{verbatim}
+(DIV, t6, t7, t8)
+(MUL, t8, t9, t10)
+(SUB, t5, t10, t11)
+(PARAM, t4, -, -)
+(PARAM, t11, -, -)
+(CALL, gcd, 2, t12)
+(RET, t12, -, -)
+\end{verbatim}
+&
+\begin{verbatim}
+div  $t6,$t7
+move $t8,$lo
+mult $t8,$t9
+sub  $t1,$t5,$t0
+jal  gcd
+add  $v0,$t2,$zero
+jr   $ra
+\end{verbatim}
+\\
+\hline
+\begin{verbatim}
+output(gcd(x, y));
+\end{verbatim}
+&
+\begin{verbatim}
+(CALL, gcd, 2, t17)
+(PARAM, t17, -, -)
+(CALL_O, t17, -, -)
+\end{verbatim}
+&
+\begin{verbatim}
+jal  gcd
+out  $t7
+hlt
+\end{verbatim}
+\\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Validação}
+
+Além dos três exemplos acima, os programas \texttt{teste.cms} e \texttt{teste2.cms} foram compilados e executados com sucesso. A Tabela~\ref{tab:validacao} resume o tamanho das saídas geradas.
+
+\begin{table}[H]
+\centering
+\caption{Tamanho das saídas geradas pelo compilador}
+\label{tab:validacao}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Programa} & \textbf{Quádruplas} & \textbf{Instr. assembly} & \textbf{Instr. binárias} \\
+\hline
+teste2.cms & 15 & 17 & 15 \\
+teste.cms & 15 & 17 & 15 \\
+fatorial.cms & 28 & 31 & 27 \\
+gcd.cms & 42 & 66 & 58 \\
+sort.cms & 130 & 157 & 141 \\
+\hline
+\end{tabular}
+\end{table}
+
+
+
+\chapter{Conclusão}
+
+O projeto integrou compilador C- e processador MIPS monocíclico personalizado, demonstrando na prática a cadeia completa de tradução: código-fonte $\rightarrow$ quádruplas $\rightarrow$ assembly $\rightarrow$ binário $\rightarrow$ execução em FPGA/simulação.
+
+Entre as principais dificuldades, destacam-se o alinhamento entre formatos de instrução do ISA customizado e o \emph{back-end}, a implementação da convenção de chamada com pilha e \texttt{\$ra}, o tratamento de comparações (\texttt{EQ}/\texttt{NEQ}) e a tradução correta de vetores e parâmetros por referência (\texttt{ADDR}, \texttt{LOADV}, \texttt{STOREV}).
+
+Como resultados, o compilador gera sem erros os cinco programas de teste (\texttt{teste}, \texttt{teste2}, \texttt{fatorial}, \texttt{gcd} e \texttt{sort}), produzindo arquivos \texttt{.tm}, \texttt{.s} e \texttt{.txt} prontos para carga na ROM. A modelagem SysML auxiliou na organização das fases de análise e síntese.
+
+Trabalhos futuros incluem otimizações de código, suporte a mais tipos, pipeline no processador e suíte automatizada de regressão.
+
+% ---
+% Finaliza a parte no bookmark do PDF
+% para que se inicie o bookmark na raiz
+% e adiciona espaço de parte no Sumário
+% ---
+\phantompart
+
+
+% ----------------------------------------------------------
+% ELEMENTOS PÓS-TEXTUAIS
+% ----------------------------------------------------------
+\postextual
+
+% ----------------------------------------------------------
+% Referências bibliográficas
+% ----------------------------------------------------------
+
+\chapter*{Referências}
+\addcontentsline{toc}{chapter}{Referências}
+
+1 PATTERSON, D. A.; HENNESSY, J. L. *Computer Organization and Design: The Hardware/Software Interface*. 4th edition. Amsterdam, Holanda: Elsevier, 2006. 
+
+2 STALLINGS, W. *Computer Organization and Architecture*. 10th edition. Boston/MA, EUA: Pearson, 2017.
+
+3 AHO, A. V.; LAM, M. S.; SETHI, R.; ULLMAN, J. D. *Compiladores: Princípios, Técnicas e Ferramentas*. 2. ed. São Paulo: Pearson Addison Wesley, 2008.
+
+4 MANO, M. M.; KIME, C. R. *Lógica Digital*. 5. ed. São Paulo: Pearson Prentice Hall, 2013.
+
+5 BRITTON, R. *MIPS Assembly Language Programming*. 1st edition. Upper Saddle River/NJ, EUA: Prentice Hall, 2003.
+
+6 MIPS Technologies. *MIPS32® Architecture For Programmers Volume II: The MIPS32® Instruction Set*. [S.l.]: MIPS Technologies, Inc., 2003.
+
+
+
+
+% ----------------------------------------------------------
+% Apêndices
+% ----------------------------------------------------------
+
+% ---
+% Inicia os apêndices
+% ---
+\begin{apendicesenv}
+
+\chapter{Tabela completa de quádruplas}
+
+\begin{table}[H]
+\centering
+\caption{Operações emitidas por \texttt{cgen.c}}
+\label{tab:apendice-quadruplas}
+\small
+\begin{tabular}{|l|l|p{7cm}|}
+\hline
+\textbf{op} & \textbf{Campos} & \textbf{Descrição} \\
+\hline
+GOTO & main & Salto inicial para \texttt{main} \\
+FUN & tipo, nome & Início de função \\
+ARG & tipo, param, func & Parâmetro formal \\
+END & nome & Fim de função \\
+ALLOC & nome, escopo, tam. & Variável escalar ou vetor \\
+ASSIGN & lit, -, temp & Constante em temporário \\
+LOAD / STORE & var, -, temp & Leitura/escrita escalar \\
+LOADV / STOREV & arr, idx, val & Acesso indexado \\
+ADDR & arr, -, temp & Endereço base do vetor \\
+ADD..DIV, SLT, EQ, NEQ & op1, op2, dst & Operações \\
+IFF / GOTO / LAB & cond/lab & Controle de fluxo \\
+PARAM / CALL / RET & args & Chamadas e retorno \\
+CALL\_I / CALL\_O & - / val & Entrada e saída \\
+HALT & - & Fim do programa \\
+\hline
+\end{tabular}
+\end{table}
+
+\chapter{Saída binária de exemplo (\texttt{fatorial.txt})}
+
+Trecho inicial do binário gerado (27 instruções; cada linha = 32 bits):
+
+\begin{verbatim}
+01000100000000000000000000000001
+00000101110101110111111111111111
+01000001111101110100000000000000
+...
+01100000000000000000000000000000
+\end{verbatim}
+
+\end{apendicesenv}
+% ---
+
+%---------------------------------------------------------------------
+% INDICE REMISSIVO
+%---------------------------------------------------------------------
+
+\phantompart
+
+\printindex
+
+
+\end{document}

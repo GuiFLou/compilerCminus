@@ -45,7 +45,6 @@ static int hash(const char *name, const char *scope) {
 }
 
 /* =============== Built‑in Declarations ============ */
-/* These functions are always inserted into global scope ("") */
 static void insertBuiltIns(void) {
     /* int input(void)  */
     st_insert("input", 0, location++, "global", "function", "integer");
@@ -67,7 +66,7 @@ void st_insert(char *name, int lineno, int loc,
     while (l && (strcmp(name, l->name) || strcmp(scope, l->scope)))
         l = l->next;
 
-    if (!l) { /* first time */
+    if (!l) { 
         l = (BucketList)malloc(sizeof *l);
         l->name  = name;
         l->scope = scope;
@@ -79,7 +78,7 @@ void st_insert(char *name, int lineno, int loc,
         l->lines->next = NULL;
         l->next = hashTable[h];
         hashTable[h] = l;
-    } else {  /* already present – append new line */
+    } else {  
         LineList t = l->lines;
         while (t->next) t = t->next;
         t->next = (LineList)malloc(sizeof *t);
