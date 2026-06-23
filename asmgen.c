@@ -117,7 +117,7 @@ static int countFunctionArgs(const Quadruple *q)
 static int argBytes = 0;
 static void pushArg(FILE *o, const char *r)
 {
-    if (!r || r[0] == '\0') return;    /* só ignora placeholder */
+    if (!r || r[0] == '\0') return;
 
     fprintf(o,"    addi $sp,$sp,-1\n");
     fprintf(o,"    sw   %s,0($sp)\n", r);
@@ -295,7 +295,7 @@ void asmGen(Quadruple *q, const char *asmFile)
             continue;
         }
 
-        /* ---------- Função (cabeçalho) ---------- */
+        /* ---------- Função ---------- */
         if(!strcmp(op,"FUN")){
             fprintf(o,"%s:\n", q->arg2);   /* arg2 = nome da função */
             currentArgIndex = 0;
@@ -330,7 +330,7 @@ void asmGen(Quadruple *q, const char *asmFile)
         /* ---------- ALU (R‑type) ---------- */
         if (!strcmp(op, "ADD"))       fprintf(o, "    add  %s,%s,%s\n", rd, r1, r2);
         else if (!strcmp(op, "SUB"))  fprintf(o, "    sub  %s,%s,%s\n", rd, r1, r2);
-        /* MUL/DIV: ISA escreve em High/Low; copiamos Low para rd */
+        /* MUL/DIV: escreve em High/Low; copiamos Low para rd */
         else if (!strcmp(op, "MUL")) {
             fprintf(o, "    mult %s,%s\n", r1, r2);
             fprintf(o, "    move %s,$lo\n", rd);
@@ -423,7 +423,7 @@ void asmGen(Quadruple *q, const char *asmFile)
             }
         }
 
-        /* Vetor: base em $sp (se parâmetro) ou $gp+memloc; endereçamento em palavras */
+        /* Vetor: base em $sp (se parâmetro) ou $gp+memloc */
         else if (!strcmp(op, "LOADV")) {
             const char *arrName = q->arg1;
             const char *idxReg = mapT(q->arg2);
@@ -463,7 +463,7 @@ void asmGen(Quadruple *q, const char *asmFile)
             fprintf(o, "    sw   %s,0(%s)\n", r1, addrReg);
         }
 
-        /* Endereço de vetor/variável (para passar array por referência) */
+        /* Endereço de vetor/variável */
         else if (!strcmp(op, "ADDR")) {
             int loc = lookupMemloc(q->arg1);
             if (loc >= 0)

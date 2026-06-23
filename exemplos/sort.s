@@ -1,7 +1,6 @@
 # Assembly gerado automaticamente
 .text
 .globl main
-    j    main
 minloc:
     addi $sp,$sp,-1
     sw   $ra,0($sp)
