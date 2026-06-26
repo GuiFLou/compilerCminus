@@ -23,7 +23,6 @@ static int currentFunctionArgCount = 0;
 static const char *currentFunction = "global";
 static int currentFunctionEndReachable = 1;
 static int mainExitEmitted = 0;
-/* Parâmetros só na pilha (não em $gp): nomes na ordem de ARG para a função atual */
 static const char *paramNames[MAX_PARAMS];
 static int paramCount = 0;
 /* Palavras empilhadas pelo callee desde a entrada (para offset de parâmetros em $sp) */

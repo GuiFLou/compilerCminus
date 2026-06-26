@@ -3,3 +3,5 @@
 *.exe
 compilador
 attr.name
+*.tex
+todo.md
