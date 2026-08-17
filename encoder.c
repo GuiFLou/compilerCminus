@@ -14,6 +14,7 @@ static int mapReg(const char *r){
     if(!strcasecmp(r,"$zero")) return 0;
     if(!strcasecmp(r,"$v0"))   return 2;
     if(!strcasecmp(r,"$sp"))   return 29;
+    if(!strcasecmp(r,"$fp"))   return 30;
     if(!strcasecmp(r,"$gp"))   return 28;
     if(!strcasecmp(r,"$ra"))   return 31;
     if(!strcasecmp(r,"$hi"))   return 62;   /* High: resto (Div), parte alta (Mult) */

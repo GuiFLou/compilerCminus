@@ -1,0 +1,16 @@
+/* 5! = 120, com local `acc` em cada ativação recursiva */
+
+int fact(int n)
+{
+    int acc;
+    if (n < 2) return 1;
+    acc = fact(n - 1);
+    return n * acc;
+}
+
+void main(void)
+{
+    int r;
+    r = fact(5);
+    output(r);
+}

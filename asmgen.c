@@ -16,6 +16,7 @@ static const char *T[] = {
 };
 #define NT 10
 #define MAX_PARAMS 16
+#define MAX_LOCALS 64
 static int nxtT = 0;
 static int asmLabNum = 0;
 static int currentArgIndex = 0;  /* índice do parâmetro atual dentro da função */
@@ -25,8 +26,11 @@ static int currentFunctionEndReachable = 1;
 static int mainExitEmitted = 0;
 static const char *paramNames[MAX_PARAMS];
 static int paramCount = 0;
-/* Palavras empilhadas pelo callee desde a entrada (para offset de parâmetros em $sp) */
-static int stackDelta = 0;
+/* Locais do frame atual: offsets negativos relativos a $fp */
+static const char *localNames[MAX_LOCALS];
+static int localOffsets[MAX_LOCALS];
+static int localCount = 0;
+static int frameLocalsSize = 0;
 static const char *nextT(void) {
     const char *r = T[nxtT];
     nxtT = (nxtT + 1) % NT;
@@ -98,6 +102,142 @@ static int getParamIndex(const char *name)
     return -1;
 }
 
+/* 0($fp)=old $fp, 1($fp)=$ra, 2($fp)=último parâmetro, (1+N)($fp)=primeiro */
+static int paramOffset(int pidx)
+{
+    return 1 + paramCount - pidx;
+}
+
+static int lookupLocalOffset(const char *name, int *off)
+{
+    int i;
+    if (!name || !off) return 0;
+    for (i = 0; i < localCount; i++) {
+        if (localNames[i] && strcmp(localNames[i], name) == 0) {
+            *off = localOffsets[i];
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Percorre ALLOC até END e reserva palavras com offsets negativos em $fp. */
+static void collectFrame(const Quadruple *funQuad)
+{
+    const Quadruple *qq;
+    localCount = 0;
+    frameLocalsSize = 0;
+    if (!funQuad) return;
+
+    for (qq = funQuad->next; qq && strcmp(qq->op, "END"); qq = qq->next) {
+        int size = 1;
+        if (strcmp(qq->op, "ALLOC"))
+            continue;
+        if (!strcmp(qq->arg2, "global"))
+            continue;
+        if (qq->result[0] && strcmp(qq->result, "-") && isNumericLiteral(qq->result)) {
+            size = atoi(qq->result);
+            if (size < 1) size = 1;
+        }
+        if (localCount >= MAX_LOCALS)
+            continue;
+        frameLocalsSize += size;
+        localNames[localCount] = qq->arg1;
+        localOffsets[localCount] = -frameLocalsSize;
+        localCount++;
+    }
+}
+
+static void resetFrame(void)
+{
+    localCount = 0;
+    frameLocalsSize = 0;
+    memset((void *)localNames, 0, sizeof(localNames));
+    memset(localOffsets, 0, sizeof(localOffsets));
+}
+
+static void emitPrologue(FILE *o)
+{
+    /* Frame: 0($fp)=old $fp, 1($fp)=$ra, 2($fp)..=params; locais em offsets negativos */
+    fprintf(o, "    addi $sp,$sp,-1\n");
+    fprintf(o, "    sw   $ra,0($sp)\n");
+    fprintf(o, "    addi $sp,$sp,-1\n");
+    fprintf(o, "    sw   $fp,0($sp)\n");
+    fprintf(o, "    add  $fp,$sp,$zero\n");
+    if (frameLocalsSize > 0)
+        fprintf(o, "    addi $sp,$sp,-%d\n", frameLocalsSize);
+}
+
+static void emitEpilogue(FILE *o)
+{
+    fprintf(o, "    add  $sp,$fp,$zero\n");
+    fprintf(o, "    lw   $fp,0($sp)\n");
+    fprintf(o, "    addi $sp,$sp,1\n");
+    fprintf(o, "    lw   $ra,0($sp)\n");
+    fprintf(o, "    addi $sp,$sp,1\n");
+    fprintf(o, "    jr   $ra\n");
+}
+
+static void emitLoad(FILE *o, const char *rd, const char *name)
+{
+    int pidx = getParamIndex(name);
+    int off;
+    if (pidx >= 0) {
+        fprintf(o, "    lw   %s,%d($fp)\n", rd, paramOffset(pidx));
+        return;
+    }
+    if (lookupLocalOffset(name, &off)) {
+        fprintf(o, "    lw   %s,%d($fp)\n", rd, off);
+        return;
+    }
+    {
+        char memOp[32];
+        resolveMemOperand(name, memOp, sizeof(memOp));
+        fprintf(o, "    lw   %s,%s($gp)\n", rd, memOp);
+    }
+}
+
+static void emitStore(FILE *o, const char *rs, const char *name)
+{
+    int pidx = getParamIndex(name);
+    int off;
+    if (pidx >= 0) {
+        fprintf(o, "    sw   %s,%d($fp)\n", rs, paramOffset(pidx));
+        return;
+    }
+    if (lookupLocalOffset(name, &off)) {
+        fprintf(o, "    sw   %s,%d($fp)\n", rs, off);
+        return;
+    }
+    {
+        char memOp[32];
+        resolveMemOperand(name, memOp, sizeof(memOp));
+        fprintf(o, "    sw   %s,%s($gp)\n", rs, memOp);
+    }
+}
+
+/* Parâmetro-vetor: carrega o ponteiro. Local: $fp+off. Global: $gp+memloc. */
+static void emitBaseAddr(FILE *o, const char *rd, const char *name)
+{
+    int pidx = getParamIndex(name);
+    int off;
+    if (pidx >= 0) {
+        fprintf(o, "    lw   %s,%d($fp)\n", rd, paramOffset(pidx));
+        return;
+    }
+    if (lookupLocalOffset(name, &off)) {
+        fprintf(o, "    addi %s,$fp,%d\n", rd, off);
+        return;
+    }
+    {
+        int loc = lookupMemloc(name);
+        if (loc >= 0)
+            fprintf(o, "    addi %s,$gp,%d\n", rd, loc);
+        else
+            fprintf(o, "    # base %s not found\n", name);
+    }
+}
+
 static int countFunctionArgs(const Quadruple *q)
 {
     int count = 0;
@@ -121,7 +261,6 @@ static void pushArg(FILE *o, const char *r)
     fprintf(o,"    addi $sp,$sp,-1\n");
     fprintf(o,"    sw   %s,0($sp)\n", r);
     argBytes += 1;
-    stackDelta += 1;
 }
 
 static void popArgCount(FILE *o, int count)
@@ -130,7 +269,6 @@ static void popArgCount(FILE *o, int count)
     if (count > argBytes) count = argBytes;
     if (count <= 0) return;
 
-    stackDelta -= count;
     fprintf(o, "    addi $sp,$sp,%d\n", count);
     argBytes -= count;
 }
@@ -150,9 +288,7 @@ static void emitFunctionExit(FILE *o, const char *retReg)
         return;
     }
 
-    fprintf(o, "    lw   $ra,0($sp)\n");
-    fprintf(o, "    addi $sp,$sp,1\n");
-    fprintf(o, "    jr   $ra\n");
+    emitEpilogue(o);
 }
 
 static int findLabelInFunction(Quadruple **body, int bodyCount, const char *label)
@@ -303,16 +439,13 @@ void asmGen(Quadruple *q, const char *asmFile)
             currentFunction = q->arg2;
             currentFunctionEndReachable = functionEndIsReachable(q);
             argBytes = 0;
-            stackDelta = 0;
             memset((void *)paramNames, 0, sizeof(paramNames));
-            /* Prologue: salva $ra em offset fixo do frame (0($sp)); parâmetros ficam em 1($sp)... */
-            fprintf(o, "    addi $sp,$sp,-1\n");
-            fprintf(o, "    sw   $ra,0($sp)\n");
-            stackDelta = 1;
+            collectFrame(q);
+            emitPrologue(o);
             q = q->next; continue;
         }
 
-        /* ---------- Parâmetro de função: só registrar nome; acesso via $sp ---------- */
+        /* ---------- Parâmetro de função: só registrar nome; acesso via $fp ---------- */
         if (!strcmp(op, "ARG")) {
             if (currentArgIndex < MAX_PARAMS)
                 paramNames[currentArgIndex] = q->arg2;  /* arg2 = nome do parâmetro */
@@ -400,45 +533,19 @@ void asmGen(Quadruple *q, const char *asmFile)
 
         /* ---------- Memória ---------- */
         else if (!strcmp(op, "LOAD")) {
-            int pidx = getParamIndex(q->arg1);
-            if (pidx >= 0) {
-                int off = (paramCount - 1 - pidx) + stackDelta;
-                fprintf(o, "    lw   %s,%d($sp)\n", rd, off);
-            } else {
-                char memOp[32];
-                resolveMemOperand(q->arg1, memOp, sizeof(memOp));
-                fprintf(o, "    lw   %s,%s($gp)\n", rd, memOp);
-            }
+            emitLoad(o, rd, q->arg1);
         }
         else if (!strcmp(op, "STORE")) {
-            int pidx = getParamIndex(q->result);
-            if (pidx >= 0) {
-                int off = (paramCount - 1 - pidx) + stackDelta;
-                fprintf(o, "    sw   %s,%d($sp)\n", r1, off);
-            } else {
-                char memOp[32];
-                resolveMemOperand(q->result, memOp, sizeof(memOp));
-                fprintf(o, "    sw   %s,%s($gp)\n", r1, memOp);
-            }
+            emitStore(o, r1, q->result);
         }
 
-        /* Vetor: base em $sp (se parâmetro) ou $gp+memloc */
+        /* Vetor: parâmetro (ponteiro em $fp), local ($fp+off) ou global ($gp+memloc) */
         else if (!strcmp(op, "LOADV")) {
             const char *arrName = q->arg1;
             const char *idxReg = mapT(q->arg2);
             const char *baseReg = nextTExcept(idxReg, rd);
             const char *addrReg = nextTExcept(idxReg, baseReg);
-            int pidx = getParamIndex(arrName);
-            if (pidx >= 0) {
-                int off = (paramCount - 1 - pidx) + stackDelta;
-                fprintf(o, "    lw   %s,%d($sp)\n", baseReg, off);
-            } else {
-                int loc = lookupMemloc(arrName);
-                if (loc >= 0)
-                    fprintf(o, "    addi %s,$gp,%d\n", baseReg, loc);
-                else
-                    fprintf(o, "    # LOADV base %s not found\n", arrName);
-            }
+            emitBaseAddr(o, baseReg, arrName);
             fprintf(o, "    add  %s,%s,%s\n", addrReg, baseReg, idxReg);
             fprintf(o, "    lw   %s,0(%s)\n", rd, addrReg);
         }
@@ -447,28 +554,14 @@ void asmGen(Quadruple *q, const char *asmFile)
             const char *idxReg = mapT(q->arg2);
             const char *baseReg = nextTExcept(r1, idxReg);
             const char *addrReg = nextTExcept(r1, baseReg);
-            int pidx = getParamIndex(arrName);
-            if (pidx >= 0) {
-                int off = (paramCount - 1 - pidx) + stackDelta;
-                fprintf(o, "    lw   %s,%d($sp)\n", baseReg, off);
-            } else {
-                int loc = lookupMemloc(arrName);
-                if (loc >= 0)
-                    fprintf(o, "    addi %s,$gp,%d\n", baseReg, loc);
-                else
-                    fprintf(o, "    # STOREV base %s not found\n", arrName);
-            }
+            emitBaseAddr(o, baseReg, arrName);
             fprintf(o, "    add  %s,%s,%s\n", addrReg, baseReg, idxReg);
             fprintf(o, "    sw   %s,0(%s)\n", r1, addrReg);
         }
 
         /* Endereço de vetor/variável */
         else if (!strcmp(op, "ADDR")) {
-            int loc = lookupMemloc(q->arg1);
-            if (loc >= 0)
-                fprintf(o, "    addi %s,$gp,%d\n", rd, loc);
-            else
-                fprintf(o, "    # ADDR %s: symbol not found\n", q->arg1);
+            emitBaseAddr(o, rd, q->arg1);
         }
 
         /* ---------- Controle de fluxo ---------- */
@@ -495,7 +588,7 @@ void asmGen(Quadruple *q, const char *asmFile)
             currentFunctionArgCount = 0;
             paramCount = 0;
             argBytes = 0;
-            stackDelta = 0;
+            resetFrame();
         }
         else if(!strcmp(op,"ALLOC")) {
             q = q->next;
