@@ -1,0 +1,16 @@
+/* Soma os algarismos de 1234. */
+
+void main(void)
+{
+    int numero;
+    int digito;
+    int soma;
+    numero = 1234;
+    soma = 0;
+    while (numero > 0) {
+        digito = numero - numero / 10 * 10;
+        soma = soma + digito;
+        numero = numero / 10;
+    }
+    output(soma);
+}

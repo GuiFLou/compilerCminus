@@ -1,0 +1,18 @@
+/* Calcula 2 elevado a 8 por multiplicacoes sucessivas. */
+
+void main(void)
+{
+    int base;
+    int expoente;
+    int resultado;
+    int i;
+    base = 2;
+    expoente = 8;
+    resultado = 1;
+    i = 0;
+    while (i < expoente) {
+        resultado = resultado * base;
+        i = i + 1;
+    }
+    output(resultado);
+}

@@ -1,0 +1,21 @@
+/* Imprime os 8 primeiros numeros da sequencia de Fibonacci. */
+
+void main(void)
+{
+    int quantidade;
+    int anterior;
+    int atual;
+    int proximo;
+    int i;
+    quantidade = 8;
+    anterior = 0;
+    atual = 1;
+    i = 0;
+    while (i < quantidade) {
+        output(anterior);
+        proximo = anterior + atual;
+        anterior = atual;
+        atual = proximo;
+        i = i + 1;
+    }
+}

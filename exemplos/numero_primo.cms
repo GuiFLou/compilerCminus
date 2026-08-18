@@ -1,0 +1,20 @@
+/* Verifica se 29 e primo. Imprime 1 para verdadeiro. */
+
+void main(void)
+{
+    int numero;
+    int divisor;
+    int resto;
+    int primo;
+    numero = 29;
+    divisor = 2;
+    primo = 1;
+    while (divisor * divisor <= numero) {
+        resto = numero - numero / divisor * divisor;
+        if (resto == 0) {
+            primo = 0;
+        }
+        divisor = divisor + 1;
+    }
+    output(primo);
+}

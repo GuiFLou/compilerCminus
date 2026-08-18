@@ -1,0 +1,22 @@
+/* Calcula a media inteira dos valores 5, 7, 8, 9 e 6. */
+
+void main(void)
+{
+    int valores[5];
+    int soma;
+    int i;
+    int media;
+    valores[0] = 5;
+    valores[1] = 7;
+    valores[2] = 8;
+    valores[3] = 9;
+    valores[4] = 6;
+    soma = 0;
+    i = 0;
+    while (i < 5) {
+        soma = soma + valores[i];
+        i = i + 1;
+    }
+    media = soma / 5;
+    output(media);
+}
