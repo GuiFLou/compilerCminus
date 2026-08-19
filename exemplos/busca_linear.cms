@@ -1,4 +1,4 @@
-/* Procura o valor 9 em um vetor e imprime seu indice. */
+/* Le um vetor, procura um valor e imprime seu indice. */
 
 void main(void)
 {
@@ -6,13 +6,12 @@ void main(void)
     int procurado;
     int encontrado;
     int i;
-    valores[0] = 4;
-    valores[1] = 7;
-    valores[2] = 2;
-    valores[3] = 9;
-    valores[4] = 5;
-    valores[5] = 1;
-    procurado = 9;
+    i = 0;
+    while (i < 6) {
+        valores[i] = input();
+        i = i + 1;
+    }
+    procurado = input();
     encontrado = 0 - 1;
     i = 0;
     while (i < 6) {

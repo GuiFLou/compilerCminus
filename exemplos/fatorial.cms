@@ -1,9 +1,9 @@
-/* calcula 5! = 120 e imprime em r0 */
+/* Calcula o fatorial de um numero informado pelo usuario. */
 
 void main(void) {
     int n;
     int result;
-    n = 5;
+    n = input();
     result = 1;
     while (n > 0) {
         result = result * n;

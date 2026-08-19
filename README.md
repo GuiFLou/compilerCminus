@@ -120,6 +120,21 @@ vsim work.MIPS
 run 5 us   ;# display deve mostrar 120 (0x0078)
 ```
 
+### Resetar e recompilar os exemplos
+
+O script `reset_tests.sh` remove os arquivos gerados (`.s`, `.tm`, `.txt` e `.mem`) de
+`exemplos/` e recompila os programas C-:
+
+```bash
+./reset_tests.sh                         # todos os exemplos
+./reset_tests.sh --compile               # recompila o compilador e os exemplos
+./reset_tests.sh --compile fatorial gcd  # somente programas selecionados
+./reset_tests.sh --no-test               # somente remove arquivos antigos
+```
+
+Os nomes dos programas devem ser informados sem a pasta e sem a extensão
+`.cms`.
+
 ---
 
 ## 6 | Estrutura do Projeto <a id="estrutura"></a>

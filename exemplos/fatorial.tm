@@ -1,7 +1,7 @@
   0: (FUN, void, main, -)
   1: (ALLOC, n, main, -)
   2: (ALLOC, result, main, -)
-  3: (ASSIGN, 5, -, t0)
+  3: (CALL_I, -, -, t0)
   4: (STORE, t0, -, n)
   5: (ASSIGN, 1, -, t1)
   6: (STORE, t1, -, result)

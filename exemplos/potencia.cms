@@ -1,4 +1,4 @@
-/* Calcula 2 elevado a 8 por multiplicacoes sucessivas. */
+/* Calcula base elevada ao expoente por multiplicacoes sucessivas. */
 
 void main(void)
 {
@@ -6,8 +6,8 @@ void main(void)
     int expoente;
     int resultado;
     int i;
-    base = 2;
-    expoente = 8;
+    base = input();
+    expoente = input();
     resultado = 1;
     i = 0;
     while (i < expoente) {

@@ -50,18 +50,20 @@ main:
     addi $sp,$sp,-1
     sw   $fp,0($sp)
     add  $fp,$sp,$zero
+    addi $sp,$sp,-2
+    in   $t1
+    sw   $t1,-1($fp)
+    lw   $t2,-1($fp)
     addi $sp,$sp,-1
-    addi $t1,$zero,5
-    addi $sp,$sp,-1
-    sw   $t1,0($sp)
+    sw   $t2,0($sp)
     jal  fact
     addi $sp,$sp,1
-    add  $t2,$v0,$zero
-    sw   $t2,-1($fp)
-    lw   $t3,-1($fp)
+    add  $t3,$v0,$zero
+    sw   $t3,-2($fp)
+    lw   $t4,-2($fp)
     addi $sp,$sp,-1
-    sw   $t3,0($sp)
-    out  $t3
+    sw   $t4,0($sp)
+    out  $t4
     addi $sp,$sp,1
     # END main
     hlt

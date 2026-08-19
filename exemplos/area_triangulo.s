@@ -8,9 +8,9 @@ main:
     sw   $fp,0($sp)
     add  $fp,$sp,$zero
     addi $sp,$sp,-3
-    addi $t0,$zero,10
+    in   $t0
     sw   $t0,-1($fp)
-    addi $t1,$zero,6
+    in   $t1
     sw   $t1,-2($fp)
     lw   $t2,-1($fp)
     lw   $t3,-2($fp)

@@ -1,4 +1,4 @@
-/* Calcula a media inteira dos valores 5, 7, 8, 9 e 6. */
+/* Calcula a media inteira de cinco valores informados pelo usuario. */
 
 void main(void)
 {
@@ -6,14 +6,10 @@ void main(void)
     int soma;
     int i;
     int media;
-    valores[0] = 5;
-    valores[1] = 7;
-    valores[2] = 8;
-    valores[3] = 9;
-    valores[4] = 6;
     soma = 0;
     i = 0;
     while (i < 5) {
+        valores[i] = input();
         soma = soma + valores[i];
         i = i + 1;
     }

@@ -2,7 +2,7 @@
   1: (ALLOC, numero, main, -)
   2: (ALLOC, digito, main, -)
   3: (ALLOC, soma, main, -)
-  4: (ASSIGN, 1234, -, t0)
+  4: (CALL_I, -, -, t0)
   5: (STORE, t0, -, numero)
   6: (ASSIGN, 0, -, t1)
   7: (STORE, t1, -, soma)

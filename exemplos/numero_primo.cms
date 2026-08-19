@@ -1,4 +1,4 @@
-/* Verifica se 29 e primo. Imprime 1 para verdadeiro. */
+/* Verifica se um numero e primo. Imprime 1 para verdadeiro. */
 
 void main(void)
 {
@@ -6,7 +6,7 @@ void main(void)
     int divisor;
     int resto;
     int primo;
-    numero = 29;
+    numero = input();
     divisor = 2;
     primo = 1;
     while (divisor * divisor <= numero) {

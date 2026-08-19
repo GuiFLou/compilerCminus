@@ -1,12 +1,12 @@
-/* Calcula a area de um triangulo de base 10 e altura 6. */
+/* Calcula a area de um triangulo a partir da base e da altura. */
 
 void main(void)
 {
     int base;
     int altura;
     int area;
-    base = 10;
-    altura = 6;
+    base = input();
+    altura = input();
     area = base * altura / 2;
     output(area);
 }

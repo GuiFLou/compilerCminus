@@ -4,7 +4,7 @@
   3: (ALLOC, atual, main, -)
   4: (ALLOC, proximo, main, -)
   5: (ALLOC, i, main, -)
-  6: (ASSIGN, 8, -, t0)
+  6: (CALL_I, -, -, t0)
   7: (STORE, t0, -, quantidade)
   8: (ASSIGN, 0, -, t1)
   9: (STORE, t1, -, anterior)

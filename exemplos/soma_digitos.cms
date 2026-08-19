@@ -1,11 +1,11 @@
-/* Soma os algarismos de 1234. */
+/* Soma os algarismos de um numero. */
 
 void main(void)
 {
     int numero;
     int digito;
     int soma;
-    numero = 1234;
+    numero = input();
     soma = 0;
     while (numero > 0) {
         digito = numero - numero / 10 * 10;

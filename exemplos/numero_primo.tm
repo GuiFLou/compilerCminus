@@ -3,7 +3,7 @@
   2: (ALLOC, divisor, main, -)
   3: (ALLOC, resto, main, -)
   4: (ALLOC, primo, main, -)
-  5: (ASSIGN, 29, -, t0)
+  5: (CALL_I, -, -, t0)
   6: (STORE, t0, -, numero)
   7: (ASSIGN, 2, -, t1)
   8: (STORE, t1, -, divisor)

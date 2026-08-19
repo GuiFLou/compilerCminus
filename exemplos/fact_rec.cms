@@ -1,4 +1,4 @@
-/* 5! = 120, com local `acc` em cada ativação recursiva */
+/* Fatorial recursivo, com local `acc` em cada ativacao */
 
 int fact(int n)
 {
@@ -10,7 +10,9 @@ int fact(int n)
 
 void main(void)
 {
+    int n;
     int r;
-    r = fact(5);
+    n = input();
+    r = fact(n);
     output(r);
 }

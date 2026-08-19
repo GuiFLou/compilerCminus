@@ -8,7 +8,7 @@ main:
     sw   $fp,0($sp)
     add  $fp,$sp,$zero
     addi $sp,$sp,-5
-    addi $t0,$zero,8
+    in   $t0
     sw   $t0,-1($fp)
     addi $t1,$zero,0
     sw   $t1,-2($fp)
