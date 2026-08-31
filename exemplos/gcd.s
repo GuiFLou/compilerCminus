@@ -1,6 +1,8 @@
 # Assembly gerado automaticamente
 .text
 .globl main
+    addi $sp,$zero,1015
+    j    main
 gcd:
     addi $sp,$sp,-1
     sw   $ra,0($sp)

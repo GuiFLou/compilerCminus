@@ -17,6 +17,9 @@ static const char *T[] = {
 #define NT 10
 #define MAX_PARAMS 16
 #define MAX_LOCALS 64
+/* Último endereço de dados antes do MMIO (CSR 1016–1019, HD 1020–1023).
+ * O reset do processador ainda põe $sp em 1023; o boot abaixo corrige. */
+#define STACK_TOP 1015
 static int nxtT = 0;
 static int asmLabNum = 0;
 static int currentArgIndex = 0;  /* índice do parâmetro atual dentro da função */
@@ -419,6 +422,9 @@ void asmGen(Quadruple *q, const char *asmFile)
     }
 
     fprintf(o, "# Assembly gerado automaticamente\n.text\n.globl main\n");
+    /* PC=0: não cair na primeira FUN (gcd/minloc). Pilha abaixo do MMIO. */
+    fprintf(o, "    addi $sp,$zero,%d\n", STACK_TOP);
+    fprintf(o, "    j    main\n");
 
     while (q) {
         const char *op = q->op;
