@@ -17,8 +17,8 @@ typedef struct QuadrupleRec {
 /* lista global de quádruplas */
 extern Quadruple *quadList;
 
-/* Gera quádruplas + asm + .mem/.txt                        */
-void codeGen(TreeNode *syntaxTree, const char *baseName);
+/* Gera quádruplas + asm + .mem/.txt; retorna 0 em sucesso  */
+int codeGen(TreeNode *syntaxTree, const char *baseName);
 
 /* Emite quádrupla                                          */
 void emit(const char *op,

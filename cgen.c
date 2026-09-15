@@ -314,7 +314,7 @@ static void genStmt(TreeNode *t)
 }
 
 /* ---------- "main" code generation ---------- */
-void codeGen(TreeNode *syntaxTree, const char *base)
+int codeGen(TreeNode *syntaxTree, const char *base)
 {
     quadList = lastQuad = NULL;
     tempCount = 0;
@@ -334,11 +334,18 @@ void codeGen(TreeNode *syntaxTree, const char *base)
         sprintf(memf, "%s.mem", base);
 
         FILE *ft = fopen(tm, "w");
+        if (!ft) {
+            perror(tm);
+            return -2;
+        }
         printQuads(ft);
-        fclose(ft);
+        if (fclose(ft) != 0) {
+            perror(tm);
+            return -2;
+        }
 
         asmGen(quadList, asmf);
-        encodeAsm(asmf, memf);
+        return encodeAsm(asmf, memf);
     }
 }
 

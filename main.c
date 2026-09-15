@@ -32,7 +32,6 @@
 int lineno = 0;
 FILE *source;
 FILE *listing;
-FILE *code;
 
 /* flags de tracing */
 int EchoSource   = TRUE;
@@ -114,18 +113,12 @@ int main(int argc, char *argv[]) {
         char *dot = strrchr(base, '.');
         if (dot) *dot = '\0';
 
-        /* arquivo .tm para IR/assembly (output da codeGen) */
-        char codefile[264];
-        snprintf(codefile, sizeof(codefile), "%s.tm", base);
-        code = fopen(codefile, "w");
-        if (!code) {
-            fprintf(stderr, "Unable to open %s\n", codefile);
+        /* codeGen deve produzir também <base>.mem */
+        if (codeGen(syntaxTree, base) != 0) {
+            fprintf(stderr, "Falha ao gerar o binário de %s\n", pgm);
+            fclose(source);
             return 1;
         }
-
-        /* codeGen deve produzir também <base>.mem */
-        codeGen(syntaxTree, base); 
-        fclose(code);
 
         /* se --txt, renomeia <base>.mem → <base>.txt */
         if (outTxt) {
@@ -134,6 +127,8 @@ int main(int argc, char *argv[]) {
             snprintf(txtName, sizeof(txtName), "%s.txt", base);
             if (rename(memName, txtName) != 0) {
                 perror("rename .mem → .txt");
+                fclose(source);
+                return 1;
             }
         }
     }

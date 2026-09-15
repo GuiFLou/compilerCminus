@@ -422,7 +422,8 @@ void asmGen(Quadruple *q, const char *asmFile)
     }
 
     fprintf(o, "# Assembly gerado automaticamente\n.text\n.globl main\n");
-    /* PC=0: não cair na primeira FUN (gcd/minloc). Pilha abaixo do MMIO. */
+    /* PC=0 no .s; o encoder prefixa um NOP com o tamanho no .txt. */
+    /* Não cair na primeira FUN (gcd/minloc). Pilha abaixo do MMIO. */
     fprintf(o, "    addi $sp,$zero,%d\n", STACK_TOP);
     fprintf(o, "    j    main\n");
 
