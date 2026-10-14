@@ -74,6 +74,26 @@ static char *genCallArg(TreeNode *t)
     return genExp(t);
 }
 
+static int isHdBuiltin(const char *name)
+{
+    return name && (!strcmp(name, "loadHD") || !strcmp(name, "storeHD") ||
+                    !strcmp(name, "loadROM"));
+}
+
+/* loadHD/storeHD/loadROM: (setor, addr) → 0=done, 1=error. Sem opcode novo. */
+static char *genHdCall(TreeNode *t)
+{
+    TreeNode *setorNode = t->child[0];
+    TreeNode *addrNode = setorNode ? setorNode->sibling : NULL;
+    char *setor = genCallArg(setorNode);
+    char *addr = genCallArg(addrNode);
+    char *dst = newTemp();
+    emit(!strcmp(t->attr.name, "loadHD") ? "HDLOAD" :
+         !strcmp(t->attr.name, "storeHD") ? "HDSTORE" : "HDROM",
+         setor, addr, dst);
+    return dst;
+}
+
 /* ---------- expressoes ---------- */
 static char *genExp(TreeNode *t)
 {
@@ -84,6 +104,9 @@ static char *genExp(TreeNode *t)
             char *dst = newTemp();
             emit("CALL_I", "-", "-", dst);
             return dst;
+        }
+        else if (isHdBuiltin(t->attr.name)) {
+            return genHdCall(t);
         }
         else {
             int cnt = 0;
@@ -267,6 +290,9 @@ static void genStmt(TreeNode *t)
                 char *arg0 = genExp(t->child[0]);
                 emit("PARAM", arg0, "-", "-");
                 emit("CALL_O", arg0, "-", "-");
+            }
+            else if (isHdBuiltin(t->attr.name)) {
+                genHdCall(t);
             }
             else {
                 int cnt = 0;

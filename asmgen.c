@@ -20,6 +20,14 @@ static const char *T[] = {
 /* Último endereço de dados antes do MMIO (CSR 1016–1019, HD 1020–1023).
  * O reset do processador ainda põe $sp em 1023; o boot abaixo corrige. */
 #define STACK_TOP 1015
+#define HD_CMD    1020
+#define HD_SECTOR 1021
+#define HD_ADDR   1022
+#define HD_STATUS 1023
+#define HD_CMD_LOAD  1
+#define HD_CMD_ROM   2
+#define HD_CMD_STORE 3
+#define HD_STATUS_DONE 2
 static int nxtT = 0;
 static int asmLabNum = 0;
 static int currentArgIndex = 0;  /* índice do parâmetro atual dentro da função */
@@ -217,6 +225,28 @@ static void emitStore(FILE *o, const char *rs, const char *name)
         resolveMemOperand(name, memOp, sizeof(memOp));
         fprintf(o, "    sw   %s,%s($gp)\n", rs, memOp);
     }
+}
+
+/* Transfere um setor via MMIO (cmd 1=RAM, 2=IMEM, 3=RAM→HD). 0=done, 1=error. */
+static void emitHdTransfer(FILE *o, const char *sectorReg, const char *addrReg,
+                           const char *dst, int cmd)
+{
+    const char *cmdReg = nextTExcept(sectorReg, addrReg);
+    const char *statusReg = nextTExcept(cmdReg, dst);
+    const char *cmpReg = nextTExcept(statusReg, dst);
+    int lab = asmLabNum++;
+
+    fprintf(o, "    sw   %s,%d($zero)\n", sectorReg, HD_SECTOR);
+    fprintf(o, "    sw   %s,%d($zero)\n", addrReg, HD_ADDR);
+    fprintf(o, "    addi %s,$zero,%d\n", cmdReg, cmd);
+    fprintf(o, "    sw   %s,%d($zero)\n", cmdReg, HD_CMD);
+    fprintf(o, ".L_hd_poll_%d:\n", lab);
+    fprintf(o, "    lw   %s,%d($zero)\n", statusReg, HD_STATUS);
+    fprintf(o, "    addi %s,$zero,%d\n", cmpReg, HD_STATUS_DONE);
+    fprintf(o, "    slt  %s,%s,%s\n", cmpReg, statusReg, cmpReg);
+    fprintf(o, "    bne  %s,$zero,.L_hd_poll_%d\n", cmpReg, lab);
+    fprintf(o, "    addi %s,$zero,%d\n", cmpReg, HD_STATUS_DONE);
+    fprintf(o, "    sub  %s,%s,%s\n", dst, statusReg, cmpReg);
 }
 
 /* Parâmetro-vetor: carrega o ponteiro. Local: $fp+off. Global: $gp+memloc. */
@@ -614,6 +644,12 @@ void asmGen(Quadruple *q, const char *asmFile)
             fprintf(o, "    out  %s\n", r1);
             popArgCount(o, 1);
         }
+        else if (!strcmp(op, "HDLOAD"))
+            emitHdTransfer(o, r1, r2, rd, HD_CMD_LOAD);
+        else if (!strcmp(op, "HDROM"))
+            emitHdTransfer(o, r1, r2, rd, HD_CMD_ROM);
+        else if (!strcmp(op, "HDSTORE"))
+            emitHdTransfer(o, r1, r2, rd, HD_CMD_STORE);
 
         else if (!strcmp(op, "RET")) {
             emitFunctionExit(o, strcmp(q->arg1, "-") ? r1 : NULL);

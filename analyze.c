@@ -41,6 +41,20 @@ static const char *lookupDeclaredType(TreeNode *t)
     return declType;
 }
 
+static int countSiblings(TreeNode *t)
+{
+    int n = 0;
+    for (; t; t = t->sibling)
+        ++n;
+    return n;
+}
+
+static int isHdBuiltin(const char *name)
+{
+    return name && (!strcmp(name, "loadHD") || !strcmp(name, "storeHD") ||
+                    !strcmp(name, "loadROM"));
+}
+
 /* contador de endereços de variável */
 static int location = 0;
 
@@ -89,7 +103,7 @@ static void insertNode(TreeNode *t)
                 typeError(t, "Error 4: Invalid Declaration. Already declared.");
             break;
         case callK:
-            /* built‑ins input/output já estão na ST global */
+            /* built-ins input/output/loadHD/storeHD/loadROM já estão na ST */
             if (st_lookup(t->attr.name, t->attr.scope) == -1 &&
                 st_lookup(t->attr.name, "global") == -1)
                 typeError(t, "Error 5: Invalid Call. It was not declared.");
@@ -99,6 +113,8 @@ static void insertNode(TreeNode *t)
                 /* apenas anota a linha */
                 st_insert(t->attr.name, t->lineno, 0, t->attr.scope, "call",
                           (char *)expTypeName(t->type));
+                if (isHdBuiltin(t->attr.name) && countSiblings(t->child[0]) != 2)
+                    typeError(t, "loadHD/storeHD/loadROM expects two integer arguments");
             }
             break;
         case returnK:
@@ -137,7 +153,7 @@ static void insertNode(TreeNode *t)
 /******************* construção da ST *****************/
 void buildSymtab(TreeNode *syntaxTree)
 {
-    symtabInit(); /* built‑ins input/output + reset */
+    symtabInit(); /* built-ins input/output/loadHD/storeHD/loadROM + reset */
 
     traverse(syntaxTree, insertNode, nullProc);
 

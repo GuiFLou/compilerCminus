@@ -50,6 +50,10 @@ static void insertBuiltIns(void) {
     st_insert("input", 0, location++, "global", "function", "integer");
     /* void output(int) */
     st_insert("output",0, location++, "global", "function", "void(int)");
+    /* int loadHD/storeHD/loadROM(int, int) — MMIO do HD, sem opcode novo */
+    st_insert("loadHD", 0, location++, "global", "function", "integer(int,int)");
+    st_insert("storeHD", 0, location++, "global", "function", "integer(int,int)");
+    st_insert("loadROM", 0, location++, "global", "function", "integer(int,int)");
 }
 
 /* ================ Public Interface ================ */
