@@ -17,7 +17,7 @@ static int yylex(void);
 digito       [0-9]
 NUM         {digito}+
 letra       [a-zA-Z]
-ID          {letra}+
+ID          {letra}({letra}|_)*
 newline     [\n]
 whitespace  [ \t\r]+
 special     [+ - * / < <= > >= == != = ; , () [] {} /* */]

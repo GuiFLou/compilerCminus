@@ -54,6 +54,10 @@ static void insertBuiltIns(void) {
     st_insert("loadHD", 0, location++, "global", "function", "integer(int,int)");
     st_insert("storeHD", 0, location++, "global", "function", "integer(int,int)");
     st_insert("loadROM", 0, location++, "global", "function", "integer(int,int)");
+    /* LCD em 4091. As máscaras saem no backend; o C- não tem shift. */
+    st_insert("lcdshow", 0, location++, "global", "function", "void(int,int,int)");
+    st_insert("lcdack", 0, location++, "global", "function", "integer");
+    st_insert("lcdsel", 0, location++, "global", "function", "integer");
 }
 
 /* ================ Public Interface ================ */

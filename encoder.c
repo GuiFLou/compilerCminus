@@ -560,6 +560,19 @@ static int encodeInstruction(Instruction *instruction, int pc, uint32_t *word)
                               instruction->lineNumber) != 0)
                 return -1;
             *word = makeF1(op->opcode, rs, rt, 0, 0);
+        } else if (op->opcode == 13 || op->opcode == 14) {
+            /* SR/SL: RD ← RS >> shamt. O terceiro operando é o imediato,
+             * não um registrador. O processador lê esse valor em instr[7:0]. */
+            long shamt;
+            if (requireOperandCount(instruction, 3, 3) != 0 ||
+                parseRegister(instruction->operands[0], &rd,
+                              instruction->lineNumber) != 0 ||
+                parseRegister(instruction->operands[1], &rs,
+                              instruction->lineNumber) != 0 ||
+                parseInteger(instruction->operands[2], 0, 31, &shamt,
+                             "shamt", instruction->lineNumber) != 0)
+                return -1;
+            *word = makeF1(op->opcode, rs, 0, rd, (int)shamt);
         } else {
             if (requireOperandCount(instruction, 3, 3) != 0 ||
                 parseRegister(instruction->operands[0], &rd,

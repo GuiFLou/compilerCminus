@@ -80,6 +80,33 @@ static int isHdBuiltin(const char *name)
                     !strcmp(name, "loadROM"));
 }
 
+static int isLcdBuiltin(const char *name)
+{
+    return name && (!strcmp(name, "lcdshow") || !strcmp(name, "lcdack") ||
+                    !strcmp(name, "lcdsel"));
+}
+
+/* lcdshow(mode, id, pid) escreve 4091. lcdack/lcdsel leem os bits 27 e 26:22. */
+static char *genLcdCall(TreeNode *t)
+{
+    if (!strcmp(t->attr.name, "lcdshow")) {
+        TreeNode *modeNode = t->child[0];
+        TreeNode *idNode = modeNode ? modeNode->sibling : NULL;
+        TreeNode *pidNode = idNode ? idNode->sibling : NULL;
+        char *mode = genCallArg(modeNode);
+        char *id = genCallArg(idNode);
+        char *pid = genCallArg(pidNode);
+        emit("LCD_MODE", mode, "-", "-");
+        emit("LCD_ID", id, "-", "-");
+        emit("LCD_PID", pid, "-", "-");
+        return "";
+    }
+
+    char *dst = newTemp();
+    emit(!strcmp(t->attr.name, "lcdack") ? "LCDACK" : "LCDSEL", "-", "-", dst);
+    return dst;
+}
+
 /* loadHD/storeHD/loadROM: (setor, addr) → 0=done, 1=error. Sem opcode novo. */
 static char *genHdCall(TreeNode *t)
 {
@@ -107,6 +134,9 @@ static char *genExp(TreeNode *t)
         }
         else if (isHdBuiltin(t->attr.name)) {
             return genHdCall(t);
+        }
+        else if (isLcdBuiltin(t->attr.name)) {
+            return genLcdCall(t);
         }
         else {
             int cnt = 0;
@@ -293,6 +323,9 @@ static void genStmt(TreeNode *t)
             }
             else if (isHdBuiltin(t->attr.name)) {
                 genHdCall(t);
+            }
+            else if (isLcdBuiltin(t->attr.name)) {
+                genLcdCall(t);
             }
             else {
                 int cnt = 0;

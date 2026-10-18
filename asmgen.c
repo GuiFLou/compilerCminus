@@ -28,7 +28,11 @@ static const char *T[] = {
 #define HD_CMD_ROM   2
 #define HD_CMD_STORE 3
 #define HD_STATUS_DONE 2
+/* display_ctx. O MMIO do HD continua em 1020 até o teste de cópia de setor. */
+#define DISP_CTX 4091
 static int nxtT = 0;
+static const char *lcdModeReg = NULL;
+static const char *lcdIdReg = NULL;
 static int asmLabNum = 0;
 static int currentArgIndex = 0;  /* índice do parâmetro atual dentro da função */
 static int currentFunctionArgCount = 0;
@@ -225,6 +229,48 @@ static void emitStore(FILE *o, const char *rs, const char *name)
         resolveMemOperand(name, memOp, sizeof(memOp));
         fprintf(o, "    sw   %s,%s($gp)\n", rs, memOp);
     }
+}
+
+static const char *nextTAvoid(const char *a, const char *b,
+                              const char *c, const char *d)
+{
+    const char *r;
+    int n = NT;
+    do {
+        r = nextT();
+        if ((!a || strcmp(r, a) != 0) && (!b || strcmp(r, b) != 0) &&
+            (!c || strcmp(r, c) != 0) && (!d || strcmp(r, d) != 0))
+            return r;
+        n--;
+    } while (n > 0);
+    return r;
+}
+
+/* Monta {pid[3:0], id[9:0], mode[7:0]} e grava em 4091. A escrita zera o ack. */
+static void emitLcdShow(FILE *o, const char *mode, const char *id, const char *pid)
+{
+    const char *m = nextTAvoid(mode, id, pid, NULL);
+    const char *i = nextTAvoid(mode, id, pid, m);
+    const char *p = nextTAvoid(mode, id, pid, i);
+    const char *w = nextTAvoid(m, i, p, mode);
+
+    fprintf(o, "    andi %s,%s,255\n", m, mode);
+    fprintf(o, "    andi %s,%s,1023\n", i, id);
+    fprintf(o, "    sl   %s,%s,8\n", i, i);
+    fprintf(o, "    or   %s,%s,%s\n", w, m, i);
+    fprintf(o, "    andi %s,%s,15\n", p, pid);
+    fprintf(o, "    sl   %s,%s,18\n", p, p);
+    fprintf(o, "    or   %s,%s,%s\n", w, w, p);
+    fprintf(o, "    sw   %s,%d($zero)\n", w, DISP_CTX);
+}
+
+/* Bits 31:28 do display_ctx são 0, então o SR aritmético equivale ao lógico. */
+static void emitLcdField(FILE *o, const char *dst, int shamt, int mask)
+{
+    const char *tmp = nextTAvoid(dst, NULL, NULL, NULL);
+    fprintf(o, "    lw   %s,%d($zero)\n", tmp, DISP_CTX);
+    fprintf(o, "    sr   %s,%s,%d\n", dst, tmp, shamt);
+    fprintf(o, "    andi %s,%s,%d\n", dst, dst, mask);
 }
 
 /* Transfere um setor via MMIO (cmd 1=RAM, 2=IMEM, 3=RAM→HD). 0=done, 1=error. */
@@ -650,6 +696,16 @@ void asmGen(Quadruple *q, const char *asmFile)
             emitHdTransfer(o, r1, r2, rd, HD_CMD_ROM);
         else if (!strcmp(op, "HDSTORE"))
             emitHdTransfer(o, r1, r2, rd, HD_CMD_STORE);
+        else if (!strcmp(op, "LCD_MODE"))
+            lcdModeReg = r1;
+        else if (!strcmp(op, "LCD_ID"))
+            lcdIdReg = r1;
+        else if (!strcmp(op, "LCD_PID"))
+            emitLcdShow(o, lcdModeReg, lcdIdReg, r1);
+        else if (!strcmp(op, "LCDACK"))
+            emitLcdField(o, rd, 27, 1);
+        else if (!strcmp(op, "LCDSEL"))
+            emitLcdField(o, rd, 22, 31);
 
         else if (!strcmp(op, "RET")) {
             emitFunctionExit(o, strcmp(q->arg1, "-") ? r1 : NULL);

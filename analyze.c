@@ -103,7 +103,7 @@ static void insertNode(TreeNode *t)
                 typeError(t, "Error 4: Invalid Declaration. Already declared.");
             break;
         case callK:
-            /* built-ins input/output/loadHD/storeHD/loadROM já estão na ST */
+            /* built-ins input/output/HD/LCD já estão na ST */
             if (st_lookup(t->attr.name, t->attr.scope) == -1 &&
                 st_lookup(t->attr.name, "global") == -1)
                 typeError(t, "Error 5: Invalid Call. It was not declared.");
@@ -115,6 +115,11 @@ static void insertNode(TreeNode *t)
                           (char *)expTypeName(t->type));
                 if (isHdBuiltin(t->attr.name) && countSiblings(t->child[0]) != 2)
                     typeError(t, "loadHD/storeHD/loadROM expects two integer arguments");
+                if (!strcmp(t->attr.name, "lcdshow") && countSiblings(t->child[0]) != 3)
+                    typeError(t, "lcdshow expects mode, id and pid");
+                if ((!strcmp(t->attr.name, "lcdack") || !strcmp(t->attr.name, "lcdsel")) &&
+                    countSiblings(t->child[0]) != 0)
+                    typeError(t, "lcdack/lcdsel expect no arguments");
             }
             break;
         case returnK:
@@ -129,16 +134,24 @@ static void insertNode(TreeNode *t)
             if (st_lookup(t->attr.name, t->attr.scope) == -1 &&
                 st_lookup(t->attr.name, "global") == -1)
                 typeError(t, "Error 1: it was not declared");
-            else
+            else if (st_lookup(t->attr.name, t->attr.scope) != -1)
                 st_insert(t->attr.name, t->lineno, 0, t->attr.scope, "vector",
+                           "integer");
+            else
+                /* Uso de vetor global: anota na declaração. Um símbolo novo
+                 * no escopo da função gravaria memloc 0 e esconderia o endereço. */
+                st_insert(t->attr.name, t->lineno, 0, "global", "vector",
                            "integer");
             break;
         case vectorIdK:
             if (st_lookup(t->attr.name, t->attr.scope) == -1 &&
                 st_lookup(t->attr.name, "global") == -1)
                 typeError(t, "Error 1: it was not declared");
-            else
+            else if (st_lookup(t->attr.name, t->attr.scope) != -1)
                 st_insert(t->attr.name, t->lineno, 0, t->attr.scope,
+                           "vector index", "integer");
+            else
+                st_insert(t->attr.name, t->lineno, 0, "global",
                            "vector index", "integer");
             break;
         default:
@@ -153,7 +166,7 @@ static void insertNode(TreeNode *t)
 /******************* construção da ST *****************/
 void buildSymtab(TreeNode *syntaxTree)
 {
-    symtabInit(); /* built-ins input/output/loadHD/storeHD/loadROM + reset */
+    symtabInit(); /* built-ins input/output/HD/LCD + reset */
 
     traverse(syntaxTree, insertNode, nullProc);
 
