@@ -43,8 +43,10 @@ int TraceCode    = TRUE;
 int Error = FALSE;
 
 /* ---------------------- protótipos ----------------------------- */
+int targetOsUser = 0;
+
 static void usage(const char *prog) {
-    fprintf(stderr,"usage: %s [--txt] <file[.cms]>\n", prog);
+    fprintf(stderr,"usage: %s [--txt] [--target=os-user] <file[.cms]>\n", prog);
 }
 
 /* ---------------------- função principal ----------------------- */
@@ -56,6 +58,12 @@ int main(int argc, char *argv[]) {
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--txt") == 0) {
             outTxt = 1;
+        } else if (strcmp(argv[i], "--target=os-user") == 0) {
+            targetOsUser = 1;
+        } else if (!strncmp(argv[i], "--target=", 9)) {
+            fprintf(stderr, "alvo desconhecido: %s\n", argv[i]);
+            usage(argv[0]);
+            return 1;
         } else if (!inPath) {
             inPath = argv[i];
         } else {
@@ -137,5 +145,5 @@ int main(int argc, char *argv[]) {
 #endif /* !NO_PARSE */
 
     fclose(source);
-    return 0;
+    return Error ? 1 : 0;
 }

@@ -17,19 +17,20 @@ static const char *T[] = {
 #define NT 10
 #define MAX_PARAMS 16
 #define MAX_LOCALS 64
-/* Último endereço de dados antes do MMIO (CSR 1016–1019, HD 1020–1023).
- * O reset do processador ainda põe $sp em 1023; o boot abaixo corrige. */
+/* A pilha do kernel fica em 1015. O reset do processador põe $sp em 1023;
+ * o prólogo abaixo corrige. O HD está em 4092–4095. */
 #define STACK_TOP 1015
-#define HD_CMD    1020
-#define HD_SECTOR 1021
-#define HD_ADDR   1022
-#define HD_STATUS 1023
+#define HD_CMD    4092
+#define HD_SECTOR 4093
+#define HD_ADDR   4094
+#define HD_STATUS 4095
 #define HD_CMD_LOAD  1
 #define HD_CMD_ROM   2
 #define HD_CMD_STORE 3
 #define HD_STATUS_DONE 2
-/* display_ctx. O MMIO do HD continua em 1020 até o teste de cópia de setor. */
 #define DISP_CTX 4091
+#define USER_GP   1536
+#define USER_SP   1791
 static int nxtT = 0;
 static const char *lcdModeReg = NULL;
 static const char *lcdIdReg = NULL;
@@ -499,8 +500,13 @@ void asmGen(Quadruple *q, const char *asmFile)
 
     fprintf(o, "# Assembly gerado automaticamente\n.text\n.globl main\n");
     /* PC=0 no .s; o encoder prefixa um NOP com o tamanho no .txt. */
-    /* Não cair na primeira FUN (gcd/minloc). Pilha abaixo do MMIO. */
-    fprintf(o, "    addi $sp,$zero,%d\n", STACK_TOP);
+    /* Não cair na primeira FUN (gcd/minloc). */
+    if (targetOsUser) {
+        fprintf(o, "    addi $gp,$zero,%d\n", USER_GP);
+        fprintf(o, "    addi $sp,$zero,%d\n", USER_SP);
+    } else {
+        fprintf(o, "    addi $sp,$zero,%d\n", STACK_TOP);
+    }
     fprintf(o, "    j    main\n");
 
     while (q) {

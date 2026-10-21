@@ -16,6 +16,9 @@
 
 #include "encoder.h"
 
+/* Definido em main.c. Some 3072 em cada J/JAL e recusa imagem acima de um setor. */
+extern int targetOsUser;
+
 #define F1 '1'
 #define F2 '2'
 #define F3 '3'
@@ -503,6 +506,8 @@ static int resolveRelativeImmediate(const char *operand, int pc,
     return 0;
 }
 
+static int applyUserBase(long *address, int lineNumber);
+
 static int resolveAbsoluteAddress(const char *operand, int lineNumber,
                                   long *address)
 {
@@ -511,7 +516,7 @@ static int resolveAbsoluteAddress(const char *operand, int lineNumber,
 
     if (labelAddress >= 0) {
         *address = labelAddress;
-        return 0;
+        return applyUserBase(address, lineNumber);
     }
     if (isValidLabel(operand)) {
         fprintf(stderr, "[encoder] label inexistente '%s' (linha %d)\n",
@@ -527,6 +532,19 @@ static int resolveAbsoluteAddress(const char *operand, int lineNumber,
                      "endereço absoluto", lineNumber) != 0)
         return -1;
     *address = parsed + 1;
+    return applyUserBase(address, lineNumber);
+}
+
+static int applyUserBase(long *address, int lineNumber)
+{
+    if (!targetOsUser)
+        return 0;
+    if (*address < 0 || *address > (long)MAX_F3_ADDRESS - 3072) {
+        fprintf(stderr, "[encoder] J/JAL nao cabe na folha (linha %d)\n",
+                lineNumber);
+        return -1;
+    }
+    *address += 3072;
     return 0;
 }
 
@@ -753,6 +771,12 @@ int encodeAsm(const char *srcAsm, const char *dstTXT)
     needHalt = instructions.count == 0 ||
                instructions.items[instructions.count - 1].op->opcode != OP_HLT;
     programSize = instructions.count + 1U + (needHalt ? 1U : 0U);
+    if (targetOsUser && programSize > 256) {
+        fprintf(stderr, "[encoder] os-user excede 256 palavras (%zu)\n",
+                programSize);
+        free(instructions.items);
+        return -3;
+    }
     if (programSize > (size_t)MAX_F3_ADDRESS) {
         fprintf(stderr, "[encoder] programa excede o limite de 26 bits\n");
         free(instructions.items);

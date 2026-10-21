@@ -101,5 +101,8 @@ extern int TraceAnalyze;
 
 extern int TraceCode;
 
-extern int Error; 
+extern int Error;
+
+/* 1 quando a CLI recebe --target=os-user. O alvo padrão permanece 0. */
+extern int targetOsUser;
 #endif

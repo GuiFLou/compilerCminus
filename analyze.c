@@ -55,8 +55,15 @@ static int isHdBuiltin(const char *name)
                     !strcmp(name, "loadROM"));
 }
 
+static int isLcdBuiltin(const char *name)
+{
+    return name && (!strcmp(name, "lcdshow") || !strcmp(name, "lcdack") ||
+                    !strcmp(name, "lcdsel"));
+}
+
 /* contador de endereços de variável */
 static int location = 0;
+static int dataUsed = 0;
 
 /******************* travessia genérica ****************/ 
 static void traverse(TreeNode *t,
@@ -90,6 +97,8 @@ static void insertNode(TreeNode *t)
                     st_insert(t->attr.name, t->lineno, location++, t->attr.scope,
                               "variable", "integer");
                 }
+                if (location > dataUsed)
+                    dataUsed = location;
             } else
                 typeError(t, "Error 4: Invalid Declaration. Already declared.");
             break;
@@ -113,6 +122,9 @@ static void insertNode(TreeNode *t)
                 /* apenas anota a linha */
                 st_insert(t->attr.name, t->lineno, 0, t->attr.scope, "call",
                           (char *)expTypeName(t->type));
+                if (targetOsUser &&
+                    (isHdBuiltin(t->attr.name) || isLcdBuiltin(t->attr.name)))
+                    typeError(t, "os-user nao pode chamar HD nem LCD");
                 if (isHdBuiltin(t->attr.name) && countSiblings(t->child[0]) != 2)
                     typeError(t, "loadHD/storeHD/loadROM expects two integer arguments");
                 if (!strcmp(t->attr.name, "lcdshow") && countSiblings(t->child[0]) != 3)
@@ -168,7 +180,15 @@ void buildSymtab(TreeNode *syntaxTree)
 {
     symtabInit(); /* built-ins input/output/HD/LCD + reset */
 
+    dataUsed = 0;
     traverse(syntaxTree, insertNode, nullProc);
+
+    if (targetOsUser && dataUsed > 256) {
+        fprintf(listing,
+                "os-user: dados estaticos ocupam %d palavras; o limite e 256\n",
+                dataUsed);
+        Error = TRUE;
+    }
 
     if (st_lookup("main", "global") == -1) {
         fprintf(listing, "Error: main was not declared\n");
