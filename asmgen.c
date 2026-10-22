@@ -29,6 +29,8 @@ static const char *T[] = {
 #define HD_CMD_STORE 3
 #define HD_STATUS_DONE 2
 #define DISP_CTX 4091
+#define PC_LOAD   4088
+#define KCTX_V0   1043
 #define USER_GP   1536
 #define USER_SP   1791
 static int nxtT = 0;
@@ -294,6 +296,25 @@ static void emitHdTransfer(FILE *o, const char *sectorReg, const char *addrReg,
     fprintf(o, "    bne  %s,$zero,.L_hd_poll_%d\n", cmpReg, lab);
     fprintf(o, "    addi %s,$zero,%d\n", cmpReg, HD_STATUS_DONE);
     fprintf(o, "    sub  %s,%s,%s\n", dst, statusReg, cmpReg);
+}
+
+/* runat(addr) não é jal: a chamada em C apagaria $ra e os $t antes do
+ * primeiro SW. O SW em 4088 grava PC+1, que é o primeiro LW da volta. */
+static void emitRunat(FILE *o, const char *addrReg)
+{
+    static const char *saved[] = {
+        "$v0",
+        "$t0", "$t1", "$t2", "$t3", "$t4",
+        "$t5", "$t6", "$t7", "$t8", "$t9",
+        "$gp", "$sp", "$fp", "$ra"
+    };
+    int i;
+
+    for (i = 0; i < 15; i++)
+        fprintf(o, "    sw   %s,%d($zero)\n", saved[i], KCTX_V0 + i);
+    fprintf(o, "    sw   %s,%d($zero)\n", addrReg, PC_LOAD);
+    for (i = 0; i < 15; i++)
+        fprintf(o, "    lw   %s,%d($zero)\n", saved[i], KCTX_V0 + i);
 }
 
 /* Parâmetro-vetor: carrega o ponteiro. Local: $fp+off. Global: $gp+memloc. */
@@ -712,6 +733,8 @@ void asmGen(Quadruple *q, const char *asmFile)
             emitLcdField(o, rd, 27, 1);
         else if (!strcmp(op, "LCDSEL"))
             emitLcdField(o, rd, 22, 31);
+        else if (!strcmp(op, "RUNAT"))
+            emitRunat(o, r1);
 
         else if (!strcmp(op, "RET")) {
             emitFunctionExit(o, strcmp(q->arg1, "-") ? r1 : NULL);

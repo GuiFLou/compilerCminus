@@ -61,6 +61,11 @@ static int isLcdBuiltin(const char *name)
                     !strcmp(name, "lcdsel"));
 }
 
+static int isRunatBuiltin(const char *name)
+{
+    return name && !strcmp(name, "runat");
+}
+
 /* contador de endereços de variável */
 static int location = 0;
 static int dataUsed = 0;
@@ -123,12 +128,15 @@ static void insertNode(TreeNode *t)
                 st_insert(t->attr.name, t->lineno, 0, t->attr.scope, "call",
                           (char *)expTypeName(t->type));
                 if (targetOsUser &&
-                    (isHdBuiltin(t->attr.name) || isLcdBuiltin(t->attr.name)))
-                    typeError(t, "os-user nao pode chamar HD nem LCD");
+                    (isHdBuiltin(t->attr.name) || isLcdBuiltin(t->attr.name) ||
+                     isRunatBuiltin(t->attr.name)))
+                    typeError(t, "os-user nao pode chamar HD, LCD nem runat");
                 if (isHdBuiltin(t->attr.name) && countSiblings(t->child[0]) != 2)
                     typeError(t, "loadHD/storeHD/loadROM expects two integer arguments");
                 if (!strcmp(t->attr.name, "lcdshow") && countSiblings(t->child[0]) != 3)
                     typeError(t, "lcdshow expects mode, id and pid");
+                if (isRunatBuiltin(t->attr.name) && countSiblings(t->child[0]) != 1)
+                    typeError(t, "runat expects one integer argument");
                 if ((!strcmp(t->attr.name, "lcdack") || !strcmp(t->attr.name, "lcdsel")) &&
                     countSiblings(t->child[0]) != 0)
                     typeError(t, "lcdack/lcdsel expect no arguments");

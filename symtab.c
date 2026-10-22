@@ -58,6 +58,8 @@ static void insertBuiltIns(void) {
     st_insert("lcdshow", 0, location++, "global", "function", "void(int,int,int)");
     st_insert("lcdack", 0, location++, "global", "function", "integer");
     st_insert("lcdsel", 0, location++, "global", "function", "integer");
+    /* void runat(int) — snapshot em linha reta e SW em 4088. Não é jal. */
+    st_insert("runat", 0, location++, "global", "function", "void(int)");
 }
 
 /* ================ Public Interface ================ */

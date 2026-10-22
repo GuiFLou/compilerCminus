@@ -86,6 +86,11 @@ static int isLcdBuiltin(const char *name)
                     !strcmp(name, "lcdsel"));
 }
 
+static int isRunatBuiltin(const char *name)
+{
+    return name && !strcmp(name, "runat");
+}
+
 /* lcdshow(mode, id, pid) escreve 4091. lcdack/lcdsel leem os bits 27 e 26:22. */
 static char *genLcdCall(TreeNode *t)
 {
@@ -105,6 +110,14 @@ static char *genLcdCall(TreeNode *t)
     char *dst = newTemp();
     emit(!strcmp(t->attr.name, "lcdack") ? "LCDACK" : "LCDSEL", "-", "-", dst);
     return dst;
+}
+
+/* void runat(addr). Quad própria: o asmgen emite os SW/LW, sem jal. */
+static char *genRunatCall(TreeNode *t)
+{
+    char *addr = genCallArg(t->child[0]);
+    emit("RUNAT", addr, "-", "-");
+    return "";
 }
 
 /* loadHD/storeHD/loadROM: (setor, addr) → 0=done, 1=error. Sem opcode novo. */
@@ -137,6 +150,9 @@ static char *genExp(TreeNode *t)
         }
         else if (isLcdBuiltin(t->attr.name)) {
             return genLcdCall(t);
+        }
+        else if (isRunatBuiltin(t->attr.name)) {
+            return genRunatCall(t);
         }
         else {
             int cnt = 0;
@@ -326,6 +342,9 @@ static void genStmt(TreeNode *t)
             }
             else if (isLcdBuiltin(t->attr.name)) {
                 genLcdCall(t);
+            }
+            else if (isRunatBuiltin(t->attr.name)) {
+                genRunatCall(t);
             }
             else {
                 int cnt = 0;

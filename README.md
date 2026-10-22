@@ -123,17 +123,22 @@ run 5 us   ;# display deve mostrar 120 (0x0078)
 ### Resetar e recompilar os exemplos
 
 O script `reset_tests.sh` remove os arquivos gerados (`.s`, `.tm`, `.txt` e `.mem`) de
-`exemplos/` e recompila os programas C-:
+`exemplos/` e recompila os programas C-. Essa pasta é a ROM solta da ferramenta.
+O SO executa os binários guardados no processador.
 
 ```bash
 ./reset_tests.sh                         # todos os exemplos
 ./reset_tests.sh --compile               # recompila o compilador e os exemplos
 ./reset_tests.sh --compile fatorial gcd  # somente programas selecionados
 ./reset_tests.sh --no-test               # somente remove arquivos antigos
+./reset_tests.sh --target=os-user        # grava os dez setores 20–29 do HD
+./reset_tests.sh --target=os-user sort   # grava só o setor 29
 ```
 
-Os nomes dos programas devem ser informados sem a pasta e sem a extensão
-`.cms`.
+`--target=os-user` não mexe em `exemplos/`. O binário da folha entra no setor
+já mapeado de `../processador/hd_image.txt`. Um `.cms` sem setor fica para a
+gestão de arquivos. Os nomes dos programas devem ser informados sem a pasta e
+sem a extensão `.cms`.
 
 ---
 
