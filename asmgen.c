@@ -27,7 +27,7 @@ static const char *T[] = {
 #define HD_CMD_LOAD  1
 #define HD_CMD_ROM   2
 #define HD_CMD_STORE 3
-#define HD_STATUS_DONE 2
+#define HD_STATUS_BUSY 1
 #define DISP_CTX 4091
 #define PC_LOAD   4088
 #define KCTX_V0   1043
@@ -249,7 +249,8 @@ static const char *nextTAvoid(const char *a, const char *b,
     return r;
 }
 
-/* Monta {pid[3:0], id[9:0], mode[7:0]} e grava em 4091. A escrita zera o ack. */
+/* Monta {pid[3:0], id[9:0], mode[7:0]} e grava em 4091. A escrita zera o ack, salvo
+ * um Enter ainda não lido quando o modo não muda. */
 static void emitLcdShow(FILE *o, const char *mode, const char *id, const char *pid)
 {
     const char *m = nextTAvoid(mode, id, pid, NULL);
@@ -291,11 +292,12 @@ static void emitHdTransfer(FILE *o, const char *sectorReg, const char *addrReg,
     fprintf(o, "    sw   %s,%d($zero)\n", cmdReg, HD_CMD);
     fprintf(o, ".L_hd_poll_%d:\n", lab);
     fprintf(o, "    lw   %s,%d($zero)\n", statusReg, HD_STATUS);
-    fprintf(o, "    addi %s,$zero,%d\n", cmpReg, HD_STATUS_DONE);
-    fprintf(o, "    slt  %s,%s,%s\n", cmpReg, statusReg, cmpReg);
-    fprintf(o, "    bne  %s,$zero,.L_hd_poll_%d\n", cmpReg, lab);
-    fprintf(o, "    addi %s,$zero,%d\n", cmpReg, HD_STATUS_DONE);
-    fprintf(o, "    sub  %s,%s,%s\n", dst, statusReg, cmpReg);
+    fprintf(o, "    addi %s,$zero,%d\n", cmpReg, HD_STATUS_BUSY);
+    fprintf(o, "    beq  %s,%s,.L_hd_poll_%d\n", statusReg, cmpReg, lab);
+    /* Sobram idle 0, done 2 e erro 3. Somado 3, o bit 1 só é 0 no done. */
+    fprintf(o, "    addi %s,%s,3\n", dst, statusReg);
+    fprintf(o, "    sr   %s,%s,1\n", dst, dst);
+    fprintf(o, "    andi %s,%s,1\n", dst, dst);
 }
 
 /* runat(addr) não é jal: a chamada em C apagaria $ra e os $t antes do
