@@ -60,6 +60,8 @@ static void insertBuiltIns(void) {
     st_insert("lcdsel", 0, location++, "global", "function", "integer");
     /* void runat(int) — snapshot em linha reta e SW em 4088. Não é jal. */
     st_insert("runat", 0, location++, "global", "function", "void(int)");
+    /* int mem_read(int) — lw com endereço absoluto no registrador. */
+    st_insert("mem_read", 0, location++, "global", "function", "integer(int)");
 }
 
 /* ================ Public Interface ================ */

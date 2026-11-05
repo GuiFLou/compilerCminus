@@ -66,6 +66,11 @@ static int isRunatBuiltin(const char *name)
     return name && !strcmp(name, "runat");
 }
 
+static int isMemReadBuiltin(const char *name)
+{
+    return name && !strcmp(name, "mem_read");
+}
+
 /* contador de endereços de variável */
 static int location = 0;
 static int dataUsed = 0;
@@ -129,14 +134,16 @@ static void insertNode(TreeNode *t)
                           (char *)expTypeName(t->type));
                 if (targetOsUser &&
                     (isHdBuiltin(t->attr.name) || isLcdBuiltin(t->attr.name) ||
-                     isRunatBuiltin(t->attr.name)))
-                    typeError(t, "os-user nao pode chamar HD, LCD nem runat");
+                     isRunatBuiltin(t->attr.name) || isMemReadBuiltin(t->attr.name)))
+                    typeError(t, "os-user nao pode chamar HD, LCD, runat nem mem_read");
                 if (isHdBuiltin(t->attr.name) && countSiblings(t->child[0]) != 2)
                     typeError(t, "loadHD/storeHD/loadROM expects two integer arguments");
                 if (!strcmp(t->attr.name, "lcdshow") && countSiblings(t->child[0]) != 3)
                     typeError(t, "lcdshow expects mode, id and pid");
                 if (isRunatBuiltin(t->attr.name) && countSiblings(t->child[0]) != 1)
                     typeError(t, "runat expects one integer argument");
+                if (isMemReadBuiltin(t->attr.name) && countSiblings(t->child[0]) != 1)
+                    typeError(t, "mem_read expects one integer argument");
                 if ((!strcmp(t->attr.name, "lcdack") || !strcmp(t->attr.name, "lcdsel")) &&
                     countSiblings(t->child[0]) != 0)
                     typeError(t, "lcdack/lcdsel expect no arguments");
@@ -191,9 +198,9 @@ void buildSymtab(TreeNode *syntaxTree)
     dataUsed = 0;
     traverse(syntaxTree, insertNode, nullProc);
 
-    if (targetOsUser && dataUsed > 256) {
+    if (targetOsUser && dataUsed > 768) {
         fprintf(listing,
-                "os-user: dados estaticos ocupam %d palavras; o limite e 256\n",
+                "os-user: dados estaticos ocupam %d palavras; o limite e 768\n",
                 dataUsed);
         Error = TRUE;
     }

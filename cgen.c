@@ -91,6 +91,19 @@ static int isRunatBuiltin(const char *name)
     return name && !strcmp(name, "runat");
 }
 
+static int isMemReadBuiltin(const char *name)
+{
+    return name && !strcmp(name, "mem_read");
+}
+
+static char *genMemRead(TreeNode *t)
+{
+    char *addr = genCallArg(t->child[0]);
+    char *dst = newTemp();
+    emit("MEMREAD", addr, "-", dst);
+    return dst;
+}
+
 /* lcdshow(mode, id, pid) escreve 4091. lcdack/lcdsel leem os bits 27 e 26:22. */
 static char *genLcdCall(TreeNode *t)
 {
@@ -153,6 +166,9 @@ static char *genExp(TreeNode *t)
         }
         else if (isRunatBuiltin(t->attr.name)) {
             return genRunatCall(t);
+        }
+        else if (isMemReadBuiltin(t->attr.name)) {
+            return genMemRead(t);
         }
         else {
             int cnt = 0;
@@ -345,6 +361,9 @@ static void genStmt(TreeNode *t)
             }
             else if (isRunatBuiltin(t->attr.name)) {
                 genRunatCall(t);
+            }
+            else if (isMemReadBuiltin(t->attr.name)) {
+                genMemRead(t);
             }
             else {
                 int cnt = 0;

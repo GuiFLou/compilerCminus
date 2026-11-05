@@ -21,7 +21,7 @@ Uso: $(basename "$0") [opções] [programa ...]
 Opções:
   --compile         compila o compilador antes dos testes
   --no-test         remove os arquivos gerados e não recompila os exemplos
-  --target=os-user  compila a folha e grava nos setores 20–29 do hd_image
+  --target=os-user  compila a folha e grava três setores a partir de 1 + 3×posição
   --help            mostra esta ajuda
 
 Sem --target, o script remove os .s, .tm, .txt e .mem de exemplos/ e
@@ -40,16 +40,16 @@ EOF
 
 sector_of() {
     case "$1" in
-        area_triangulo) printf '20\n' ;;
-        busca_linear) printf '21\n' ;;
-        fatorial) printf '22\n' ;;
-        fibonacci) printf '23\n' ;;
-        gcd) printf '24\n' ;;
-        media) printf '25\n' ;;
-        numero_primo) printf '26\n' ;;
-        potencia) printf '27\n' ;;
-        soma_digitos) printf '28\n' ;;
-        sort) printf '29\n' ;;
+        area_triangulo) printf '1\n' ;;
+        busca_linear) printf '4\n' ;;
+        fatorial) printf '7\n' ;;
+        fibonacci) printf '10\n' ;;
+        gcd) printf '13\n' ;;
+        media) printf '16\n' ;;
+        numero_primo) printf '19\n' ;;
+        potencia) printf '22\n' ;;
+        soma_digitos) printf '25\n' ;;
+        sort) printf '28\n' ;;
         *) printf '\n' ;;
     esac
 }
@@ -208,6 +208,9 @@ if len(lines) != 16384:
     sys.exit(1)
 
 zero = b"0" * 32
+for sector in range(31, 61):
+    start = sector * 256
+    lines[start:start + 256] = [zero] * 256
 for entry in manifest.read_text().splitlines():
     sector_text, txt_path = entry.split(None, 1)
     sector = int(sector_text)
@@ -222,13 +225,16 @@ for entry in manifest.read_text().splitlines():
             sys.stderr.write("palavra inválida em %s\n" % txt_path)
             sys.exit(1)
         words.append(word.encode())
-    if not words or len(words) > 256:
+    if not words or len(words) > 768:
         sys.stderr.write(
-            "%s tem %d palavras; um setor tem 256\n" % (txt_path, len(words))
+            "%s tem %d palavras; o trio tem 768\n" % (txt_path, len(words))
         )
         sys.exit(1)
     start = sector * 256
-    lines[start:start + 256] = words + [zero] * (256 - len(words))
+    if start + 768 > len(lines):
+        sys.stderr.write("trio do setor %d nao cabe no disco\n" % sector)
+        sys.exit(1)
+    lines[start:start + 768] = words + [zero] * (768 - len(words))
 
 payload = newline.join(lines)
 if raw.endswith(b"\n"):

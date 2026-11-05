@@ -771,8 +771,8 @@ int encodeAsm(const char *srcAsm, const char *dstTXT)
     needHalt = instructions.count == 0 ||
                instructions.items[instructions.count - 1].op->opcode != OP_HLT;
     programSize = instructions.count + 1U + (needHalt ? 1U : 0U);
-    if (targetOsUser && programSize > 256) {
-        fprintf(stderr, "[encoder] os-user excede 256 palavras (%zu)\n",
+    if (targetOsUser && programSize > 768) {
+        fprintf(stderr, "[encoder] os-user excede 768 palavras (%zu)\n",
                 programSize);
         free(instructions.items);
         return -3;
